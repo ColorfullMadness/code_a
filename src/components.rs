@@ -21,6 +21,9 @@ pub struct SpawnBundle {
     spawn: Spawn,
 }
 
+#[derive(Component)]
+pub struct MainCamera;
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
 pub struct Player;
 

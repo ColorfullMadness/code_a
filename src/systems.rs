@@ -2,13 +2,13 @@ use crate::components::*;
 use bevy::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::prelude::*;
+use bevy::input::mouse::MouseMotion;
 
 use std::{collections::{HashMap, HashSet}, thread::spawn};
 
-
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let camera = Camera2dBundle::default();
-    commands.spawn(camera);
+    commands.spawn((camera, MainCamera));
 
     let ldtk_handle = asset_server.load("test.ldtk");
     commands.spawn(LdtkWorldBundle {
@@ -16,6 +16,57 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         ..Default::default()
     });
 }
+
+pub fn mouse_move_raw(
+    mut mouse_move: EventReader<MouseMotion>
+){
+    for e in mouse_move.iter() {
+        println!("Mouse move: {:?}",e);
+    }
+}
+
+pub fn coursor_pos(
+    mut mouse_pos: EventReader<CursorMoved>,
+    mut player: Query<(&mut Transform), With<Player>>,
+){
+    for mut transform in &mut player{
+        for e in mouse_pos.iter(){
+            println!("Cursor is at: {:?}",e);
+            println!("Player is at: {:?}", transform.translation.x);
+        }
+    }
+}
+
+pub fn rotate_player(
+    mut mouse_pos: EventReader<CursorMoved>,
+    mut player_pos: Query<&mut Transform, With<Player>>,
+    mut player_sprite: Query<&mut Sprite, With<Player>>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
+){
+    for mut transform in &mut player_pos{
+        for e in mouse_pos.iter() {
+            if let Ok(mut sprite) = player_sprite.get_single_mut(){
+                if let Ok((camera,cam_transform)) = camera_query.get_single(){
+                    let mouse = Vec2::from_array([e.position.x,e.position.y]);
+
+                    if let Some(world_position) = camera.viewport_to_world_2d(cam_transform, mouse){
+                        println!("World position: {}/{}", world_position.x, world_position.y);
+                        if  world_position.x < transform.translation.x && sprite.flip_x == false {
+                            sprite.flip_x = true;
+                        } else if world_position.x > transform.translation.x && sprite.flip_x == true {
+                            sprite.flip_x = false;
+                        }
+                    }
+
+                    
+                }
+                
+            }
+        }
+            
+    }
+}
+    
 
 pub fn spawn_player(
     mut commands: Commands, 
@@ -44,7 +95,7 @@ pub fn spawn_player(
                 (
                     PlayerBundle{
                         sprite_bundle: SpriteBundle{
-                            transform: Transform::from_xyz((cords.x * 16) as f32, (cords.y * 16) as f32, 0.0),
+                            transform: Transform::from_xyz((cords.x * 16 + 8) as f32, (cords.y * 16 + 8) as f32, 0.0),
                             texture: asset_server.load("player2.png"),
                             ..default()
                         },

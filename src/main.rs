@@ -29,6 +29,8 @@ fn main() {
             ..Default::default()
         })
         .add_startup_system(setup)
+        .add_system(coursor_pos)
+        .add_system(rotate_player)
         .add_system(spawn_player)
         .add_system(spawn_wall_collision)
         .add_system(movement)
