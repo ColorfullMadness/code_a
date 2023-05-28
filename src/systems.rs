@@ -57,13 +57,9 @@ pub fn rotate_player(
                             sprite.flip_x = false;
                         }
                     }
-
-                    
                 }
-                
             }
         }
-            
     }
 }
     

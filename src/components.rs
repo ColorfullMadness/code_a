@@ -48,6 +48,29 @@ pub struct PlayerBundle {
     pub entity_instance: EntityInstance,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
+pub struct Enemy;
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
+pub struct Zombie;
+
+#[derive(Clone, Default, Bundle, LdtkEntity)]
+pub struct ZombieBundle {
+    #[sprite_bundle("zombie.png")]
+    #[bundle]
+    pub sprite_bundle: SpriteBundle,
+    #[from_entity_instance]
+    #[bundle]
+    pub collider_bundle: ColliderBundle,
+    pub enemy: Enemy,
+    pub zombie: Zombie,
+    #[worldly]
+    pub worldly: Worldly,
+    #[from_entity_instance]
+    pub entity_instance: EntityInstance,
+
+}
+
 #[derive(Clone, Component, Debug, Eq, Default, PartialEq)]
 pub struct Health(i32);
 
@@ -88,8 +111,8 @@ impl From<&EntityInstance> for ColliderBundle {
                 rotation_constraints,
                 ..Default::default()
             },
-            "Mob" => ColliderBundle {
-                collider: Collider::cuboid(5., 5.),
+            "Zombie" => ColliderBundle {
+                collider: Collider::cuboid(3., 6.),
                 rigid_body: RigidBody::KinematicVelocityBased,
                 rotation_constraints,
                 ..Default::default()

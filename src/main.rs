@@ -38,5 +38,6 @@ fn main() {
         .register_ldtk_int_cell::<components::WallBundle>(1)
         .register_ldtk_int_cell::<components::SpawnBundle>(2)
         .register_ldtk_entity::<components::PlayerBundle>("Player")
+        .register_ldtk_entity::<components::ZombieBundle>("Zombie")
         .run();
 }
