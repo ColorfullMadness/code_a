@@ -1,10 +1,10 @@
 use crate::components::*;
-use bevy::prelude::*;
+use bevy::{prelude::*, asset::AssetPath, reflect::GetPath};
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::prelude::*;
 use bevy::input::mouse::MouseMotion;
 
-use std::{collections::{HashMap, HashSet}, thread::spawn};
+use std::{collections::{HashMap, HashSet}, thread::spawn, borrow::Borrow};
 
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let camera = Camera2dBundle::default();
@@ -32,7 +32,7 @@ pub fn coursor_pos(
     for mut transform in &mut player{
         for e in mouse_pos.iter(){
             println!("Cursor is at: {:?}",e);
-            println!("Player is at: {:?}", transform.translation.x);
+            println!("Player is at: {:?}/{:?}", transform.translation.x, transform.translation.y);
         }
     }
 }
@@ -50,7 +50,7 @@ pub fn rotate_player(
                     let mouse = Vec2::from_array([e.position.x,e.position.y]);
 
                     if let Some(world_position) = camera.viewport_to_world_2d(cam_transform, mouse){
-                        println!("World position: {}/{}", world_position.x, world_position.y);
+                        //println!("World position: {}/{}", world_position.x, world_position.y);
                         if  world_position.x < transform.translation.x && sprite.flip_x == false {
                             sprite.flip_x = true;
                         } else if world_position.x > transform.translation.x && sprite.flip_x == true {
@@ -62,82 +62,26 @@ pub fn rotate_player(
         }
     }
 }
-    
 
-pub fn spawn_player(
-    mut commands: Commands, 
-    asset_server: Res<AssetServer>, 
-    spawn_query: Query<&GridCoords, Added<Spawn>>,
-    player_query: Query<Entity, With<Player>>
+pub fn zombie_movement(
+    mut zombie_query: Query<(&mut Velocity, &Transform), With<Zombie>>,
+    player_query: Query<&Transform, With<Player>>
 ){
-    // spawn_query.for_each(|(&grid_coords, parent)| {
-    //     // An intgrid tile's direct parent will be a layer entity, not the level entity
-    //     // To get the level entity, you need the tile's grandparent.
-    //     // This is where parent_query comes in.
-    //     if let Ok(grandparent) = parent_query.get(parent.get()) {
-    //         level_to_wall_locations
-    //             .entry(grandparent.get())
-    //             .or_default()
-    //             .insert(grid_coords);
-    //     }
-    // });
-    
-    if(player_query.is_empty()){
-        println!("Creating players");
-        println!("{:?}",spawn_query);
-        spawn_query.for_each(|cords|{
-            println!("1Spawning player at cords: x:{}, y:{}",cords.x, cords.y);
-            commands.spawn(
-                (
-                    PlayerBundle{
-                        sprite_bundle: SpriteBundle{
-                            transform: Transform::from_xyz((cords.x * 16 + 8) as f32, (cords.y * 16 + 8) as f32, 0.0),
-                            texture: asset_server.load("player2.png"),
-                            ..default()
-                        },
-                        collider_bundle: ColliderBundle {
-                            collider: Collider::cuboid(7., 10.),
-                            rigid_body: RigidBody::Dynamic,
-                            friction: Friction {
-                                coefficient: 0.0,
-                                combine_rule: CoefficientCombineRule::Min,
-                            },
-                            rotation_constraints: LockedAxes::ROTATION_LOCKED,
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    },
-                )
-            );
-        });
+    println!("Inside zombie movement");
+    if let Ok(player_pos) = player_query.get_single() {
+        println!("Found player pos");
+        for (mut zombie_vel, zombie_pos) in zombie_query.iter_mut() {
+            println!("Found zombie at {}/{}",zombie_pos.translation.x, zombie_pos.translation);
+            if zombie_pos.translation.distance(player_pos.translation) < 30.0 {
+                zombie_vel.linvel = (player_pos.translation - zombie_pos.translation).truncate().normalize() * 50.0;
+            } else {
+                zombie_vel.linvel = Vec2::ZERO;
+            }
+        }
     }
-    
-        //println!("2Spawning player at cords: x:{}, y:{}",12, 9);
-        // commands.spawn(
-        //     (
-        //         PlayerBundle{
-        //             sprite_bundle: SpriteBundle{
-        //                 transform: Transform::from_xyz(120 as f32, 90 as f32, 0.0),
-        //                 texture: asset_server.load("player2.png"),
-        //                 ..default()
-        //             },
-        //             collider_bundle: ColliderBundle {
-        //                 collider: Collider::cuboid(10., 13.),
-        //                 rigid_body: RigidBody::Dynamic,
-        //                 friction: Friction {
-        //                     coefficient: 0.0,
-        //                     combine_rule: CoefficientCombineRule::Min,
-        //                 },
-        //                 rotation_constraints: LockedAxes::ROTATION_LOCKED,
-        //                 ..Default::default()
-        //             },
-        //             ..Default::default()
-        //         },
-        //     )
-        // );
 }
 
-pub fn movement(
+pub fn player_movement(
     input: Res<Input<KeyCode>>,
     mut query: Query<(&mut Velocity), With<Player>>,
 ) {
@@ -155,6 +99,71 @@ pub fn movement(
         //     velocity.linvel.y = 500.;
         //     climber.climbing = false;
         // }
+    }
+}
+    
+
+pub fn spawn_player(
+    mut commands: Commands, 
+    mut ev_asset: EventReader<AssetEvent<Image>>,
+    asset_server: Res<AssetServer>, 
+    spawn_query: Query<&GridCoords, With<Spawn>>,
+    player_query: Query<Entity, With<Player>>,
+    assets: Res<Assets<Image>>,
+){
+    for ev in ev_asset.iter() {
+        match ev {
+            AssetEvent::Created { handle } => {
+                println!("Handle:{:?}", handle);
+
+                let eeeeee: Handle<Image> = asset_server.load("player2.png");
+                println!("Player sprite handle: {:?}",eeeeee);
+
+                if player_query.is_empty() && handle.id() == eeeeee.id() {
+                    println!("Creating players");
+                    println!("{:?}",spawn_query);
+            
+                    let player = assets.get(handle).unwrap();
+                    let player_height = player.texture_descriptor.size.height as f32 * 0.5;
+                    let player_width = player.texture_descriptor.size.width as f32 * 0.5;
+
+                    println!("Height: {}, Width: {}", player_height, player_width);
+            
+                    spawn_query.for_each(|cords|{
+                        println!("1Spawning player at cords: x:{}, y:{}",cords.x, cords.y);
+                        commands.spawn(
+                            (
+                                PlayerBundle{
+                                    sprite_bundle: SpriteBundle{
+                                        transform: Transform::from_xyz((cords.x * 16 + 8) as f32, (cords.y * 16 + 8) as f32, 0.0),
+                                        texture: asset_server.load("player2.png"),
+                                        visibility: Visibility::Visible,
+                                        ..default()
+                                    },
+                                    collider_bundle: ColliderBundle {
+                                        collider: Collider::cuboid(player_width, player_height),
+                                        rigid_body: RigidBody::Dynamic,
+                                        friction: Friction {
+                                            coefficient: 0.0,
+                                            combine_rule: CoefficientCombineRule::Min,
+                                        },
+                                        rotation_constraints: LockedAxes::ROTATION_LOCKED,
+                                        ..Default::default()
+                                    },
+                                    ..Default::default()
+                                },
+                            )
+                        );
+                    });
+                }
+            }
+            AssetEvent::Modified { handle } => {
+                // an image was modified
+            }
+            AssetEvent::Removed { handle } => {
+                // an image was unloaded
+            }
+        }
     }
 }
 
