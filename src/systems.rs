@@ -1,10 +1,9 @@
 use crate::components::*;
-use bevy::{prelude::*, asset::AssetPath, reflect::GetPath, input::mouse};
+use bevy::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::prelude::*;
-use bevy::input::mouse::MouseMotion;
 
-use std::{collections::{HashMap, HashSet}, thread::spawn, borrow::Borrow};
+use std::collections::{HashMap, HashSet};
 
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let camera = Camera2dBundle::default();
@@ -15,26 +14,6 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         ldtk_handle,
         ..Default::default()
     });
-}
-
-pub fn mouse_move_raw(
-    mut mouse_move: EventReader<MouseMotion>
-){
-    for e in mouse_move.iter() {
-        println!("Mouse move: {:?}",e);
-    }
-}
-
-pub fn coursor_pos(
-    mut mouse_pos: EventReader<CursorMoved>,
-    mut player: Query<(&mut Transform), With<Player>>,
-){
-    for mut transform in &mut player{
-        for e in mouse_pos.iter(){
-            println!("Cursor is at: {:?}",e);
-            println!("Player is at: {:?}/{:?}", transform.translation.x, transform.translation.y);
-        }
-    }
 }
 
 #[derive(Resource)]
@@ -99,64 +78,46 @@ pub fn zombie_movement(
     }
 }
 
-pub fn move_bullets(
-    mut bullets_query: Query<(&mut Velocity, &Transform, &Target), With<Bullet>>,
-){
-    for (mut bullet_vel, transform, target) in bullets_query.iter_mut() {
-        println!("Bullet velocity: {:?}",bullet_vel);
-        bullet_vel.linvel = (target.target - transform.translation.truncate()).normalize() * 150.0;
-    }
-}
-
-
 pub fn player_shoot(
     mut commands: Commands,
-    mut mouse_input: Res<Input<MouseButton>>,
-    mut mouse_pos: Res<MouseLoc>,
+    mouse_input: Res<Input<MouseButton>>,
+    mouse_pos: Res<MouseLoc>,
     player_pos: Query<&Transform, With<Player>>,
     asset_server: Res<AssetServer>,
 ){
     if mouse_input.pressed(MouseButton::Left) || mouse_input.just_pressed(MouseButton::Left) {
-        println!("Mouse button: LEFT");
         
-       
-
-            
-        
-
-                if let Ok(player_position) = player_pos.get_single() {
-                    let bullet_velocity = (mouse_pos.loc - player_position.translation.truncate()).normalize();
-                    commands.spawn(
-                    BulletBundle {
-                        sprite_bundle: SpriteBundle {
-                            transform: Transform {
-                                translation: Vec3::from_array([player_position.translation.x - 5.0, player_position.translation.y, 0.0]),
-                                rotation: Quat::from_rotation_x(90.0),
-                                ..Default::default()
-                            },
-                            texture: asset_server.load("bullet.png"),
-                            ..Default::default()
-                        }, 
-                        collider_bundle: ColliderBundle {
-                            collider: Collider::cuboid(0.5, 1.5),
-                            rigid_body: RigidBody::Dynamic,
-                            velocity: Velocity::linear(bullet_velocity * 1500.0),
-                            ..Default::default()
-                        },
-                        bullet: Bullet{}
-                    }
-                );
+        if let Ok(player_position) = player_pos.get_single() {
+            let bullet_velocity = (mouse_pos.loc - player_position.translation.truncate()).normalize();
+            commands.spawn(
+            BulletBundle {
+                sprite_bundle: SpriteBundle {
+                    transform: Transform {
+                        translation: Vec3::from_array([player_position.translation.x - 5.0, player_position.translation.y, 0.0]),
+                        rotation: Quat::from_rotation_x(90.0),
+                        ..Default::default()
+                    },
+                    texture: asset_server.load("bullet.png"),
+                    ..Default::default()
+                }, 
+                collider_bundle: ColliderBundle {
+                    collider: Collider::cuboid(0.5, 1.5),
+                    rigid_body: RigidBody::Dynamic,
+                    velocity: Velocity::linear(bullet_velocity * 500.0),
+                    ..Default::default()
+                },
+                bullet: Bullet{}
                 }
-            
-        
+            );
+        }
     }
 }
 
 pub fn player_movement(
     input: Res<Input<KeyCode>>,
-    mut query: Query<(&mut Velocity), With<Player>>,
+    mut query: Query<&mut Velocity, With<Player>>,
 ) {
-    for (mut velocity) in &mut query {
+    for mut velocity in &mut query {
         let right = if input.pressed(KeyCode::D) { 1. } else { 0. };
         let left = if input.pressed(KeyCode::A) { 1. } else { 0. };
         let up = if input.pressed(KeyCode::W) { 1. } else { 0. };
@@ -164,12 +125,6 @@ pub fn player_movement(
 
         velocity.linvel.x = (right - left) * 150.;
         velocity.linvel.y = (up - down) * 150.;
-        
-
-        // if input.just_pressed(KeyCode::Space) && (ground_detection.on_ground || climber.climbing) {
-        //     velocity.linvel.y = 500.;
-        //     climber.climbing = false;
-        // }
     }
 }
     
@@ -238,22 +193,6 @@ pub fn spawn_player(
     }
 }
 
-/// Spawns heron collisions for the walls of a level
-///
-/// You could just insert a ColliderBundle in to the WallBundle,
-/// but this spawns a different collider for EVERY wall tile.
-/// This approach leads to bad performance.
-///
-/// Instead, by flagging the wall tiles and spawning the collisions later,
-/// we can minimize the amount of colliding entities.
-///
-/// The algorithm used here is a nice compromise between simplicity, speed,
-/// and a small number of rectangle colliders.
-/// In basic terms, it will:
-/// 1. consider where the walls are
-/// 2. combine wall tiles into flat "plates" in each individual row
-/// 3. combine the plates into rectangles across multiple rows wherever possible
-/// 4. spawn colliders for each rectangle
 pub fn spawn_wall_collision(
     mut commands: Commands,
     wall_query: Query<(&GridCoords, &Parent), Added<Wall>>,
@@ -438,33 +377,20 @@ pub fn camera_fit_inside_current_level(
         for (level_transform, level_handle) in &level_query {
             if let Some(ldtk_level) = ldtk_levels.get(level_handle) {
                 let level = &ldtk_level.level;
-                if level_selection.is_match(&0, level) {
-                    //let level_ratio = level.px_wid as f32 / ldtk_level.level.px_hei as f32;
+                if level_selection.is_match(&0, level) { 
                     orthographic_projection.viewport_origin = Vec2::ZERO;
-                    //if level_ratio > ASPECT_RATIO {
-                        // level is wider than the screen
-                        let height = (level.px_hei as f32 / 9.).round() * 9. /1.7;
-                        let width = height * ASPECT_RATIO ;
-                        orthographic_projection.scaling_mode =
-                            bevy::render::camera::ScalingMode::Fixed { width, height };
-                        camera_transform.translation.x =
-                            (player_translation.x - level_transform.translation.x - width / 2.)
-                                .clamp(0., level.px_wid as f32 - width);
-                        camera_transform.translation.y = 
-                            (player_translation.y - level_transform.translation.y - height / 2.)
-                                .clamp(0., level.px_hei as f32 - height);
-                    // } else {
-                    //     // level is taller than the screen
-                    //     let width = (level.px_wid as f32 / 16.).round() * 16.;
-                    //     let height = width / ASPECT_RATIO;
-                    //     orthographic_projection.scaling_mode =
-                    //         bevy::render::camera::ScalingMode::Fixed { width, height };
-                    //     camera_transform.translation.y =
-                    //         (player_translation.y - level_transform.translation.y - height / 2.)
-                    //             .clamp(0., level.px_hei as f32 - height);
-                    //     camera_transform.translation.x = 0.;
-                    // }
-
+                    
+                    let height = (level.px_hei as f32 / 9.).round() * 9. /1.7;
+                    let width = height * ASPECT_RATIO ;
+                    orthographic_projection.scaling_mode =
+                        bevy::render::camera::ScalingMode::Fixed { width, height };
+                    camera_transform.translation.x =
+                        (player_translation.x - level_transform.translation.x - width / 2.)
+                            .clamp(0., level.px_wid as f32 - width);
+                    camera_transform.translation.y = 
+                        (player_translation.y - level_transform.translation.y - height / 2.)
+                            .clamp(0., level.px_hei as f32 - height);
+                    
                     camera_transform.translation.x += level_transform.translation.x;
                     camera_transform.translation.y += level_transform.translation.y;
                 }
