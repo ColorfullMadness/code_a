@@ -27,9 +27,11 @@ fn main() {
             },
             set_clear_color: SetClearColor::FromLevelBackground,
             ..Default::default()
-        })
+        }) 
+        .insert_resource(MouseLoc{ loc: Vec2::ZERO})
         .add_startup_system(setup)
-        .add_system(coursor_pos)
+        //.add_system(coursor_pos)
+        .add_system(mouse_movement_updating_system)
         .add_system(rotate_player)
         .add_system(spawn_player)
         .add_system(spawn_wall_collision)

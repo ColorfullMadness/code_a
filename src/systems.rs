@@ -37,6 +37,27 @@ pub fn coursor_pos(
     }
 }
 
+#[derive(Resource)]
+pub struct MouseLoc {
+    pub loc: Vec2
+}
+
+pub fn mouse_movement_updating_system(
+    mut mouse_pos: ResMut<MouseLoc>,
+    mut mouse_pos_event: EventReader<CursorMoved>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
+) {
+    for e in mouse_pos_event.iter() {
+        if let Ok((camera,cam_transform)) = camera_query.get_single(){
+            let mouse = Vec2::from_array([e.position.x,e.position.y]);
+            if let Some(world_position) = camera.viewport_to_world_2d(cam_transform, mouse){
+                mouse_pos.loc = world_position;
+                println!("MOUSE at: {}/{}",mouse_pos.loc.x, mouse_pos.loc.y);
+            }
+        }
+    }
+}
+
 pub fn rotate_player(
     mut mouse_pos: EventReader<CursorMoved>,
     mut player_pos: Query<&mut Transform, With<Player>>,
@@ -69,7 +90,6 @@ pub fn zombie_movement(
 ){
     if let Ok(player_pos) = player_query.get_single() {
         for (mut zombie_vel, zombie_pos) in zombie_query.iter_mut() {
-            println!("Zombie velocity: {:?}",zombie_vel);
             if zombie_pos.translation.distance(player_pos.translation) < 70.0 {
                 zombie_vel.linvel = (player_pos.translation - zombie_pos.translation).truncate().normalize() * 50.0;
             } else {
@@ -92,51 +112,43 @@ pub fn move_bullets(
 pub fn player_shoot(
     mut commands: Commands,
     mut mouse_input: Res<Input<MouseButton>>,
-    mut mouse_pos: EventReader<CursorMoved>,
+    mut mouse_pos: Res<MouseLoc>,
     player_pos: Query<&Transform, With<Player>>,
-    camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     asset_server: Res<AssetServer>,
 ){
-    if mouse_input.pressed(MouseButton::Left) {
+    if mouse_input.pressed(MouseButton::Left) || mouse_input.just_pressed(MouseButton::Left) {
         println!("Mouse button: LEFT");
-        for e in mouse_pos.iter() {
-            if let Ok((camera,cam_transform)) = camera_query.get_single(){
-                let mouse = Vec2::from_array([e.position.x,e.position.y]);
+        
+       
 
-                if let Some(world_position) = camera.viewport_to_world_2d(cam_transform, mouse){
-                    //println!("World position: {}/{}", world_position.x, world_position.y);
-                    
+            
+        
 
-                    if let Ok(player_position) = player_pos.get_single() {
-                        let bullet_velocity = (world_position - player_position.translation.truncate()).normalize();
-                        commands.spawn(
-                        BulletBundle {
-                            sprite_bundle: SpriteBundle {
-                                transform: Transform {
-                                    translation: Vec3::from_array([player_position.translation.x - 5.0, player_position.translation.y, 0.0]),
-                                    rotation: Quat::from_rotation_x(90.0),
-                                    ..Default::default()
-                                },
-                                texture: asset_server.load("bullet.png"),
-                                ..Default::default()
-                            }, 
-                            collider_bundle: ColliderBundle {
-                                collider: Collider::cuboid(0.5, 1.5),
-                                rigid_body: RigidBody::Dynamic,
-                                velocity: Velocity::linear(bullet_velocity * 1500.0),
+                if let Ok(player_position) = player_pos.get_single() {
+                    let bullet_velocity = (mouse_pos.loc - player_position.translation.truncate()).normalize();
+                    commands.spawn(
+                    BulletBundle {
+                        sprite_bundle: SpriteBundle {
+                            transform: Transform {
+                                translation: Vec3::from_array([player_position.translation.x - 5.0, player_position.translation.y, 0.0]),
+                                rotation: Quat::from_rotation_x(90.0),
                                 ..Default::default()
                             },
-                            target: Target {
-                                target: world_position
-                            },
-                            bullet: Bullet{}
-                        }
-                    );
+                            texture: asset_server.load("bullet.png"),
+                            ..Default::default()
+                        }, 
+                        collider_bundle: ColliderBundle {
+                            collider: Collider::cuboid(0.5, 1.5),
+                            rigid_body: RigidBody::Dynamic,
+                            velocity: Velocity::linear(bullet_velocity * 1500.0),
+                            ..Default::default()
+                        },
+                        bullet: Bullet{}
                     }
-                    
+                );
                 }
-            }
-        }
+            
+        
     }
 }
 

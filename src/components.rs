@@ -97,7 +97,6 @@ pub struct BulletBundle {
     pub collider_bundle: ColliderBundle,
 
     pub bullet: Bullet,
-    pub target: Target,
 
 }
 
