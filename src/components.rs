@@ -68,7 +68,6 @@ pub struct ZombieBundle {
     pub worldly: Worldly,
     #[from_entity_instance]
     pub entity_instance: EntityInstance,
-
 }
 
 #[derive(Clone, Component, Debug, Eq, Default, PartialEq)]
@@ -83,6 +82,23 @@ impl From<&EntityInstance> for Health {
                 .to_owned()
         )
     }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
+pub struct Bullet;
+
+#[derive(Copy, Clone, PartialEq, Debug, Default, Component)]
+pub struct Target {pub target: Vec2}
+
+#[derive(Clone, Default, Bundle)]
+pub struct BulletBundle {
+    #[bundle]
+    pub sprite_bundle: SpriteBundle,
+    pub collider_bundle: ColliderBundle,
+
+    pub bullet: Bullet,
+    pub target: Target,
+
 }
 
 #[derive(Clone, Debug, Default, Bundle, LdtkIntCell)]

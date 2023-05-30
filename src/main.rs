@@ -35,6 +35,8 @@ fn main() {
         .add_system(spawn_wall_collision)
         .add_system(zombie_movement)
         .add_system(player_movement)
+        .add_system(player_shoot)
+        //.add_system(move_bullets)
         .add_system(camera_fit_inside_current_level)
         .register_ldtk_int_cell::<components::WallBundle>(1)
         .register_ldtk_int_cell::<components::SpawnBundle>(2)
