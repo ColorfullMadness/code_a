@@ -1,7 +1,9 @@
 use crate::components::*;
-use bevy::prelude::*;
+use bevy::{input::mouse, prelude::*};
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::prelude::*;
+use std::f32::consts::PI;
+use std::time::Duration;
 
 use std::collections::{HashMap, HashSet};
 
@@ -18,7 +20,7 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 #[derive(Resource)]
 pub struct MouseLoc {
-    pub loc: Vec2
+    pub loc: Vec2,
 }
 
 pub fn mouse_movement_updating_system(
@@ -27,37 +29,28 @@ pub fn mouse_movement_updating_system(
     camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
 ) {
     for e in mouse_pos_event.iter() {
-        if let Ok((camera,cam_transform)) = camera_query.get_single(){
-            let mouse = Vec2::from_array([e.position.x,e.position.y]);
-            if let Some(world_position) = camera.viewport_to_world_2d(cam_transform, mouse){
+        if let Ok((camera, cam_transform)) = camera_query.get_single() {
+            let mouse = Vec2::from_array([e.position.x, e.position.y]);
+            if let Some(world_position) = camera.viewport_to_world_2d(cam_transform, mouse) {
                 mouse_pos.loc = world_position;
-                println!("MOUSE at: {}/{}",mouse_pos.loc.x, mouse_pos.loc.y);
+                println!("MOUSE at: {}/{}", mouse_pos.loc.x, mouse_pos.loc.y);
             }
         }
     }
 }
 
 pub fn rotate_player(
-    mut mouse_pos: EventReader<CursorMoved>,
+    mouse_pos: ResMut<MouseLoc>,
     mut player_pos: Query<&mut Transform, With<Player>>,
     mut player_sprite: Query<&mut Sprite, With<Player>>,
-    camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
-){
-    for mut transform in &mut player_pos{
-        for e in mouse_pos.iter() {
-            if let Ok(mut sprite) = player_sprite.get_single_mut(){
-                if let Ok((camera,cam_transform)) = camera_query.get_single(){
-                    let mouse = Vec2::from_array([e.position.x,e.position.y]);
-
-                    if let Some(world_position) = camera.viewport_to_world_2d(cam_transform, mouse){
-                        //println!("World position: {}/{}", world_position.x, world_position.y);
-                        if  world_position.x < transform.translation.x && sprite.flip_x == false {
-                            sprite.flip_x = true;
-                        } else if world_position.x > transform.translation.x && sprite.flip_x == true {
-                            sprite.flip_x = false;
-                        }
-                    }
-                }
+) {
+    for transform in &mut player_pos {
+        if let Ok(mut sprite) = player_sprite.get_single_mut() {
+            //println!("World position: {}/{}", world_position.x, world_position.y);
+            if mouse_pos.loc.x < transform.translation.x && sprite.flip_x == false {
+                sprite.flip_x = true;
+            } else if mouse_pos.loc.x > transform.translation.x && sprite.flip_x == true {
+                sprite.flip_x = false;
             }
         }
     }
@@ -65,17 +58,39 @@ pub fn rotate_player(
 
 pub fn zombie_movement(
     mut zombie_query: Query<(&mut Velocity, &Transform), With<Zombie>>,
-    player_query: Query<&Transform, With<Player>>
-){
+    player_query: Query<&Transform, With<Player>>,
+) {
     if let Ok(player_pos) = player_query.get_single() {
         for (mut zombie_vel, zombie_pos) in zombie_query.iter_mut() {
             if zombie_pos.translation.distance(player_pos.translation) < 70.0 {
-                zombie_vel.linvel = (player_pos.translation - zombie_pos.translation).truncate().normalize() * 50.0;
+                zombie_vel.linvel = (player_pos.translation - zombie_pos.translation)
+                    .truncate()
+                    .normalize()
+                    * 50.0;
             } else {
                 zombie_vel.linvel = Vec2::ZERO;
             }
         }
     }
+}
+
+#[derive(Resource)]
+pub struct FireSpeed {
+    pub timer: Timer,
+}
+
+impl Default for FireSpeed {
+    fn default() -> Self {
+        Self { timer: Timer::from_seconds(0.1, TimerMode::Repeating) 
+        }
+    }
+}
+
+pub fn tick_timers(
+    mut fire_timer: ResMut<FireSpeed>,
+    time: Res<Time>,
+){
+    fire_timer.timer.tick(time.delta());
 }
 
 pub fn player_shoot(
@@ -84,39 +99,43 @@ pub fn player_shoot(
     mouse_pos: Res<MouseLoc>,
     player_pos: Query<&Transform, With<Player>>,
     asset_server: Res<AssetServer>,
-){
+    fire_timer: ResMut<FireSpeed>
+) {
     if mouse_input.pressed(MouseButton::Left) || mouse_input.just_pressed(MouseButton::Left) {
-        
+        if fire_timer.timer.finished(){
+
         if let Ok(player_position) = player_pos.get_single() {
+
             let bullet_velocity = (mouse_pos.loc - player_position.translation.truncate()).normalize();
-            commands.spawn(
-            BulletBundle {
+            let angle = bullet_velocity.y.atan2(bullet_velocity.x);
+            commands.spawn(BulletBundle {
                 sprite_bundle: SpriteBundle {
                     transform: Transform {
-                        translation: Vec3::from_array([player_position.translation.x - 5.0, player_position.translation.y, 0.0]),
-                        rotation: Quat::from_rotation_x(90.0),
+                        translation: Vec3::from_array([
+                            player_position.translation.x + bullet_velocity.x * 5.0,
+                            player_position.translation.y + bullet_velocity.y * 5.0,
+                            0.0,
+                        ]),
+                        rotation: Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle),
                         ..Default::default()
                     },
                     texture: asset_server.load("bullet.png"),
                     ..Default::default()
-                }, 
+                },
                 collider_bundle: ColliderBundle {
                     collider: Collider::cuboid(0.5, 1.5),
                     rigid_body: RigidBody::Dynamic,
                     velocity: Velocity::linear(bullet_velocity * 500.0),
                     ..Default::default()
                 },
-                bullet: Bullet{}
-                }
-            );
+                bullet: Bullet {},
+            });
         }
+    }
     }
 }
 
-pub fn player_movement(
-    input: Res<Input<KeyCode>>,
-    mut query: Query<&mut Velocity, With<Player>>,
-) {
+pub fn player_movement(input: Res<Input<KeyCode>>, mut query: Query<&mut Velocity, With<Player>>) {
     for mut velocity in &mut query {
         let right = if input.pressed(KeyCode::D) { 1. } else { 0. };
         let left = if input.pressed(KeyCode::A) { 1. } else { 0. };
@@ -127,59 +146,58 @@ pub fn player_movement(
         velocity.linvel.y = (up - down) * 150.;
     }
 }
-    
 
 pub fn spawn_player(
-    mut commands: Commands, 
+    mut commands: Commands,
     mut ev_asset: EventReader<AssetEvent<Image>>,
-    asset_server: Res<AssetServer>, 
+    asset_server: Res<AssetServer>,
     spawn_query: Query<&GridCoords, With<Spawn>>,
     player_query: Query<Entity, With<Player>>,
     assets: Res<Assets<Image>>,
-){
+) {
     for ev in ev_asset.iter() {
         match ev {
             AssetEvent::Created { handle } => {
                 println!("Handle:{:?}", handle);
 
                 let eeeeee: Handle<Image> = asset_server.load("player2.png");
-                println!("Player sprite handle: {:?}",eeeeee);
+                println!("Player sprite handle: {:?}", eeeeee);
 
                 if player_query.is_empty() && handle.id() == eeeeee.id() {
                     println!("Creating players");
-                    println!("{:?}",spawn_query);
-            
+                    println!("{:?}", spawn_query);
+
                     let player = assets.get(handle).unwrap();
                     let player_height = player.texture_descriptor.size.height as f32 * 0.5;
                     let player_width = player.texture_descriptor.size.width as f32 * 0.5;
 
                     println!("Height: {}, Width: {}", player_height, player_width);
-            
-                    spawn_query.for_each(|cords|{
-                        println!("1Spawning player at cords: x:{}, y:{}",cords.x, cords.y);
-                        commands.spawn(
-                            (
-                                PlayerBundle{
-                                    sprite_bundle: SpriteBundle{
-                                        transform: Transform::from_xyz((cords.x * 16 + 8) as f32, (cords.y * 16 + 8) as f32, 0.0),
-                                        texture: asset_server.load("player2.png"),
-                                        visibility: Visibility::Visible,
-                                        ..default()
-                                    },
-                                    collider_bundle: ColliderBundle {
-                                        collider: Collider::cuboid(player_width, player_height),
-                                        rigid_body: RigidBody::Dynamic,
-                                        friction: Friction {
-                                            coefficient: 0.0,
-                                            combine_rule: CoefficientCombineRule::Min,
-                                        },
-                                        rotation_constraints: LockedAxes::ROTATION_LOCKED,
-                                        ..Default::default()
-                                    },
-                                    ..Default::default()
+
+                    spawn_query.for_each(|cords| {
+                        println!("1Spawning player at cords: x:{}, y:{}", cords.x, cords.y);
+                        commands.spawn((PlayerBundle {
+                            sprite_bundle: SpriteBundle {
+                                transform: Transform::from_xyz(
+                                    (cords.x * 16 + 8) as f32,
+                                    (cords.y * 16 + 8) as f32,
+                                    0.0,
+                                ),
+                                texture: asset_server.load("player2.png"),
+                                visibility: Visibility::Visible,
+                                ..default()
+                            },
+                            collider_bundle: ColliderBundle {
+                                collider: Collider::cuboid(player_width, player_height),
+                                rigid_body: RigidBody::Dynamic,
+                                friction: Friction {
+                                    coefficient: 0.0,
+                                    combine_rule: CoefficientCombineRule::Min,
                                 },
-                            )
-                        );
+                                rotation_constraints: LockedAxes::ROTATION_LOCKED,
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        },));
                     });
                 }
             }
@@ -377,20 +395,20 @@ pub fn camera_fit_inside_current_level(
         for (level_transform, level_handle) in &level_query {
             if let Some(ldtk_level) = ldtk_levels.get(level_handle) {
                 let level = &ldtk_level.level;
-                if level_selection.is_match(&0, level) { 
+                if level_selection.is_match(&0, level) {
                     orthographic_projection.viewport_origin = Vec2::ZERO;
-                    
-                    let height = (level.px_hei as f32 / 9.).round() * 9. /1.7;
-                    let width = height * ASPECT_RATIO ;
+
+                    let height = (level.px_hei as f32 / 9.).round() * 9. / 1.7;
+                    let width = height * ASPECT_RATIO;
                     orthographic_projection.scaling_mode =
                         bevy::render::camera::ScalingMode::Fixed { width, height };
                     camera_transform.translation.x =
                         (player_translation.x - level_transform.translation.x - width / 2.)
                             .clamp(0., level.px_wid as f32 - width);
-                    camera_transform.translation.y = 
+                    camera_transform.translation.y =
                         (player_translation.y - level_transform.translation.y - height / 2.)
                             .clamp(0., level.px_hei as f32 - height);
-                    
+
                     camera_transform.translation.x += level_transform.translation.x;
                     camera_transform.translation.y += level_transform.translation.y;
                 }
