@@ -2,10 +2,8 @@ use crate::components::*;
 use bevy::{input::mouse, prelude::*};
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::prelude::*;
-use std::f32::consts::PI;
-use std::time::Duration;
 
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, time::Duration};
 
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let camera = Camera2dBundle::default();
@@ -93,45 +91,90 @@ pub fn tick_timers(
     fire_timer.timer.tick(time.delta());
 }
 
+pub fn player_reload(
+    mut weapon_query: Query<&mut Weapon, With<Player>>,
+    input: Res<Input<KeyCode>>, 
+    time: Res<Time>
+){
+    if input.just_pressed(KeyCode::R) || input.pressed(KeyCode::R){
+        println!("RELOADING");
+        if let Ok(mut weapon) = weapon_query.get_single_mut(){
+            weapon.reload_timer.reload_timer.tick(time.delta());
+            if weapon.reload_timer.reload_timer.finished() {
+                weapon.ammo.bullets = 30;
+                weapon.reload_timer.reload_timer.reset();
+                println!("RELOADED + 30");
+            }
+        }
+    }
+}
+
 pub fn player_shoot(
     mut commands: Commands,
     mouse_input: Res<Input<MouseButton>>,
     mouse_pos: Res<MouseLoc>,
     player_pos: Query<&Transform, With<Player>>,
     asset_server: Res<AssetServer>,
-    fire_timer: ResMut<FireSpeed>
+    mut weapon_query: Query<&mut Weapon, With<Player>>,
+    time: Res<Time>,
 ) {
-    if mouse_input.pressed(MouseButton::Left) || mouse_input.just_pressed(MouseButton::Left) {
-        if fire_timer.timer.finished(){
 
-        if let Ok(player_position) = player_pos.get_single() {
+    if mouse_input.pressed(MouseButton::Left) || mouse_input.just_pressed(MouseButton::Left) { 
+        //TODO add different actions for pressed and just pressed
+        if let Ok(mut weapon) = weapon_query.get_single_mut(){
+            weapon.fire_rate.timer.tick(time.delta());
 
-            let bullet_velocity = (mouse_pos.loc - player_position.translation.truncate()).normalize();
-            let angle = bullet_velocity.y.atan2(bullet_velocity.x);
-            commands.spawn(BulletBundle {
-                sprite_bundle: SpriteBundle {
-                    transform: Transform {
-                        translation: Vec3::from_array([
-                            player_position.translation.x + bullet_velocity.x * 5.0,
-                            player_position.translation.y + bullet_velocity.y * 5.0,
-                            0.0,
-                        ]),
-                        rotation: Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle),
-                        ..Default::default()
-                    },
-                    texture: asset_server.load("bullet.png"),
-                    ..Default::default()
-                },
-                collider_bundle: ColliderBundle {
-                    collider: Collider::cuboid(0.5, 1.5),
-                    rigid_body: RigidBody::Dynamic,
-                    velocity: Velocity::linear(bullet_velocity * 500.0),
-                    ..Default::default()
-                },
-                bullet: Bullet {},
-            });
+            if weapon.fire_rate.to_owned().timer.finished() && weapon.ammo.bullets != 0{
+                if let Ok(player_position) = player_pos.get_single() {
+
+                    let bullet_velocity = (mouse_pos.loc - player_position.translation.truncate()).normalize();
+                    let angle = bullet_velocity.y.atan2(bullet_velocity.x);
+                    commands.spawn(BulletBundle {
+                        sprite_bundle: SpriteBundle {
+                            transform: Transform {
+                                translation: Vec3::from_array([
+                                    player_position.translation.x + bullet_velocity.x * 10.0,
+                                    player_position.translation.y + bullet_velocity.y * 10.0,
+                                    0.0,
+                                ]),
+                                rotation: Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle),
+                                ..Default::default()
+                            },
+                            texture: asset_server.load("bullet.png"),
+                            ..Default::default()
+                        },
+                        collider_bundle: ColliderBundle {
+                            collider: Collider::cuboid(0.5, 1.5),
+                            rigid_body: RigidBody::Dynamic,
+                            velocity: Velocity::linear(bullet_velocity * 500.0),
+                            ..Default::default()
+                        },
+                        bullet: Bullet {},
+                    }).insert(Sensor).insert(ActiveEvents::COLLISION_EVENTS);
+
+                    weapon.ammo.bullets -= 1;
+                }
+            }
         }
     }
+}
+
+
+pub fn bullet_collisions(
+    mut bullet_collisions: EventReader<CollisionEvent>, 
+    mut commands: Commands,
+){
+    for bullet in bullet_collisions.iter(){
+        println!("Received collision event: {:?}", bullet.to_owned());
+        let b = bullet.to_owned();
+        match b {
+            CollisionEvent::Started(e1, e2, _) => {
+                commands.entity(e2).despawn();
+            }, 
+            CollisionEvent::Stopped(e1, e2, _) => {
+             
+            }
+        }
     }
 }
 
@@ -196,6 +239,8 @@ pub fn spawn_player(
                                 rotation_constraints: LockedAxes::ROTATION_LOCKED,
                                 ..Default::default()
                             },
+                            weapon: Weapon{
+                                ..Default::default()},
                             ..Default::default()
                         },));
                     });
@@ -290,6 +335,7 @@ pub fn spawn_wall_collision(
                                     left: s,
                                     right: x - 1,
                                 });
+
                                 plate_start = None;
                             }
                             (None, true) => plate_start = Some(x),

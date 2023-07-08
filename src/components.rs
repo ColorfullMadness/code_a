@@ -36,6 +36,7 @@ pub struct PlayerBundle {
     #[bundle]
     pub collider_bundle: ColliderBundle,
     pub player: Player,
+    pub weapon: Weapon, 
     #[worldly]
     pub worldly: Worldly,
 
@@ -46,6 +47,49 @@ pub struct PlayerBundle {
     // The whole EntityInstance can be stored directly as an EntityInstance component
     #[from_entity_instance]
     pub entity_instance: EntityInstance,
+}
+
+#[derive(Clone, Default, Component)]
+pub struct Weapon {
+    pub fire_rate: FireRate,
+    pub ammo: Ammo,
+    pub reload_timer: ReloadTimer,
+}
+
+#[derive(Clone, Component, Debug)]
+pub struct FireRate{
+    pub timer: Timer
+}
+
+impl Default for FireRate {
+    fn default() -> Self {
+        Self { timer: Timer::from_seconds(0.1, TimerMode::Repeating) 
+        }
+    }
+}
+
+#[derive(Clone, Component, Debug)]
+pub struct Ammo{
+    pub bullets: u32,
+}
+
+impl Default for Ammo {
+    fn default() -> Self {
+        Self {
+            bullets: 30,
+        }
+    }
+}
+
+#[derive(Clone, Component, Debug)]
+pub struct ReloadTimer{
+    pub reload_timer: Timer,
+}
+
+impl Default for ReloadTimer {
+    fn default() -> Self {
+        Self { reload_timer: Timer::from_seconds(2.0, TimerMode::Once) }
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
@@ -97,7 +141,6 @@ pub struct BulletBundle {
     pub collider_bundle: ColliderBundle,
 
     pub bullet: Bullet,
-
 }
 
 #[derive(Clone, Debug, Default, Bundle, LdtkIntCell)]
@@ -127,7 +170,7 @@ impl From<&EntityInstance> for ColliderBundle {
                 ..Default::default()
             },
             "Zombie" => ColliderBundle {
-                collider: Collider::cuboid(3., 6.),
+                collider: Collider::ball(12.0),
                 rigid_body: RigidBody::KinematicVelocityBased,
                 rotation_constraints,
                 ..Default::default()

@@ -32,6 +32,8 @@ fn main() {
         .insert_resource(FireSpeed::default())
         .add_startup_system(setup)
         //.add_system(coursor_pos)
+        .add_system(bullet_collisions)
+        .add_system(player_reload)
         .add_system(mouse_movement_updating_system)
         .add_system(tick_timers)
         .add_system(rotate_player)
