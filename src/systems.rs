@@ -95,10 +95,11 @@ pub fn player_reload(
     mut weapon_query: Query<&mut Weapon, With<Player>>,
     input: Res<Input<KeyCode>>, 
     time: Res<Time>
-){
-    if input.just_pressed(KeyCode::R) || input.pressed(KeyCode::R){
-        println!("RELOADING");
-        if let Ok(mut weapon) = weapon_query.get_single_mut(){
+){   
+   
+    if let Ok(mut weapon) = weapon_query.get_single_mut(){
+        if (input.just_pressed(KeyCode::R) || input.pressed(KeyCode::R)) && weapon.ammo.bullets == 0{
+            println!("RELOADING");
             weapon.reload_timer.reload_timer.tick(time.delta());
             if weapon.reload_timer.reload_timer.finished() {
                 weapon.ammo.bullets = 30;
@@ -107,6 +108,7 @@ pub fn player_reload(
             }
         }
     }
+    
 }
 
 pub fn player_shoot(
