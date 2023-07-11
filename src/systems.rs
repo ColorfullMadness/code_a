@@ -72,25 +72,6 @@ pub fn zombie_movement(
     }
 }
 
-#[derive(Resource)]
-pub struct FireSpeed {
-    pub timer: Timer,
-}
-
-impl Default for FireSpeed {
-    fn default() -> Self {
-        Self { timer: Timer::from_seconds(0.1, TimerMode::Repeating) 
-        }
-    }
-}
-
-pub fn tick_timers(
-    mut fire_timer: ResMut<FireSpeed>,
-    time: Res<Time>,
-){
-    fire_timer.timer.tick(time.delta());
-}
-
 pub fn player_reload(
     mut weapon_query: Query<&mut Weapon, With<Player>>,
     input: Res<Input<KeyCode>>, 
@@ -161,9 +142,20 @@ pub fn player_shoot(
     }
 }
 
+pub fn despawn_zombie(
+    mut commands: Commands, 
+    mut zombie_query: Query<(&mut Health, Entity), With<Zombie>>
+) {
+    for (health, zombie) in zombie_query.iter() {
+        if health.health_points == 0 {
+            commands.entity(zombie).despawn();
+        }
+    }
+}
 
 pub fn bullet_collisions(
     mut bullet_collisions: EventReader<CollisionEvent>, 
+    mut zombie_query: Query<(&mut Health, Entity), With<Zombie>>,
     mut commands: Commands,
 ){
     for bullet in bullet_collisions.iter(){
@@ -171,7 +163,13 @@ pub fn bullet_collisions(
         let b = bullet.to_owned();
         match b {
             CollisionEvent::Started(e1, e2, _) => {
-                commands.entity(e2).despawn();
+                for (mut health, entity) in zombie_query.iter_mut() {
+                    if entity.eq(&e1){
+                        commands.entity(e2).despawn();
+                        health.health_points -= 1;
+                        println!("Entity: {:?} took 1 dmg and now has: {:?}", commands.entity(entity).id(), health.health_points);
+                    }
+                }
             }, 
             CollisionEvent::Stopped(e1, e2, _) => {
              

@@ -112,21 +112,32 @@ pub struct ZombieBundle {
     pub worldly: Worldly,
     #[from_entity_instance]
     pub entity_instance: EntityInstance,
+    pub health: Health,
 }
 
-#[derive(Clone, Component, Debug, Eq, Default, PartialEq)]
-pub struct Health(i32);
+#[derive(Clone, Component, Debug, Eq, PartialEq)]
+pub struct Health {
+    pub health_points: i32, 
+}
 
-impl From<&EntityInstance> for Health {
-    fn from(entity_instance: &EntityInstance) -> Self {
-        Health(
-            entity_instance
-                .get_int_field("health")
-                .expect("health field should be correctly typed")
-                .to_owned()
-        )
+impl Default for Health{
+    fn default() -> Self {
+        Self {
+            health_points: 2,
+        }
     }
 }
+
+// impl From<&EntityInstance> for Health {
+//     fn from(entity_instance: &EntityInstance) -> Self {
+//         Health(
+//             entity_instance
+//                 .get_int_field("health")
+//                 .expect("health field should be correctly typed")
+//                 .to_owned()
+//         )
+//     }
+// }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
 pub struct Bullet;
@@ -171,7 +182,7 @@ impl From<&EntityInstance> for ColliderBundle {
             },
             "Zombie" => ColliderBundle {
                 collider: Collider::ball(12.0),
-                rigid_body: RigidBody::KinematicVelocityBased,
+                rigid_body: RigidBody::Dynamic,
                 rotation_constraints,
                 ..Default::default()
             },
