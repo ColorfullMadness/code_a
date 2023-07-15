@@ -1,7 +1,5 @@
 use bevy::prelude::*;
-use bevy_ecs_ldtk::{prelude::*, utils::ldtk_pixel_coords_to_translation_pivoted, ldtk::all_some_iter::AllSomeIter};
-
-use std::collections::HashSet;
+use bevy_ecs_ldtk::prelude::*;
 
 use bevy_rapier2d::prelude::*;
 
@@ -123,7 +121,7 @@ pub struct Health {
 impl Default for Health{
     fn default() -> Self {
         Self {
-            health_points: 2,
+            health_points: 10,
         }
     }
 }
@@ -152,6 +150,24 @@ pub struct BulletBundle {
     pub collider_bundle: ColliderBundle,
 
     pub bullet: Bullet,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
+pub struct Grenade;
+
+#[derive(Clone, Default, Bundle)]
+pub struct GrenadeBundle {
+    #[bundle]
+    pub sprite_bundle: SpriteBundle,
+    pub collider_bundle: ColliderBundle, 
+
+    pub timer: DetonationTimer, 
+    pub grenade: Grenade,
+}
+
+#[derive(Clone, Component, Debug, Default)]
+pub struct DetonationTimer{
+    pub detonation_timer: Timer,
 }
 
 #[derive(Clone, Debug, Default, Bundle, LdtkIntCell)]

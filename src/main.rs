@@ -40,6 +40,8 @@ fn main() {
         .add_system(zombie_movement)
         .add_system(player_movement)
         .add_system(player_shoot)
+        .add_system(player_throw_grenade)
+        .add_system(blow_up_granade)
         .add_system(despawn_zombie)
         //.add_system(move_bullets)
         .add_system(camera_fit_inside_current_level)

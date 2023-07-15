@@ -1,9 +1,9 @@
 use crate::components::*;
-use bevy::{input::mouse, prelude::*};
+use bevy::{prelude::*, transform::commands};
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::prelude::*;
 
-use std::{collections::{HashMap, HashSet}, time::Duration};
+use std::collections::{HashMap, HashSet};
 
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let camera = Camera2dBundle::default();
@@ -31,7 +31,7 @@ pub fn mouse_movement_updating_system(
             let mouse = Vec2::from_array([e.position.x, e.position.y]);
             if let Some(world_position) = camera.viewport_to_world_2d(cam_transform, mouse) {
                 mouse_pos.loc = world_position;
-                println!("MOUSE at: {}/{}", mouse_pos.loc.x, mouse_pos.loc.y);
+                //println!("MOUSE at: {}/{}", mouse_pos.loc.x, mouse_pos.loc.y);
             }
         }
     }
@@ -45,9 +45,9 @@ pub fn rotate_player(
     for transform in &mut player_pos {
         if let Ok(mut sprite) = player_sprite.get_single_mut() {
             //println!("World position: {}/{}", world_position.x, world_position.y);
-            if mouse_pos.loc.x < transform.translation.x && sprite.flip_x == false {
+            if mouse_pos.loc.x < transform.translation.x && !sprite.flip_x {
                 sprite.flip_x = true;
-            } else if mouse_pos.loc.x > transform.translation.x && sprite.flip_x == true {
+            } else if mouse_pos.loc.x > transform.translation.x && sprite.flip_x {
                 sprite.flip_x = false;
             }
         }
@@ -60,7 +60,7 @@ pub fn zombie_movement(
 ) {
     if let Ok(player_pos) = player_query.get_single() {
         for (mut zombie_vel, zombie_pos) in zombie_query.iter_mut() {
-            if zombie_pos.translation.distance(player_pos.translation) < 70.0 {
+            if zombie_pos.translation.distance(player_pos.translation) < 50.0 {
                 zombie_vel.linvel = (player_pos.translation - zombie_pos.translation)
                     .truncate()
                     .normalize()
@@ -87,6 +87,9 @@ pub fn player_reload(
                 weapon.reload_timer.reload_timer.reset();
                 println!("RELOADED + 30");
             }
+        }
+        if input.just_released(KeyCode::R) {
+            weapon.reload_timer.reload_timer.reset();
         }
     }
     
@@ -116,7 +119,7 @@ pub fn player_shoot(
                         sprite_bundle: SpriteBundle {
                             transform: Transform {
                                 translation: Vec3::from_array([
-                                    player_position.translation.x + bullet_velocity.x * 10.0,
+                                    player_position.translation.x + bullet_velocity.x * 8.0,
                                     player_position.translation.y + bullet_velocity.y * 10.0,
                                     0.0,
                                 ]),
@@ -142,9 +145,70 @@ pub fn player_shoot(
     }
 }
 
+pub fn blow_up_granade(
+    time: Res<Time>,
+    mut grenades: Query<(&mut DetonationTimer, &Transform, Entity), With<Grenade>>,
+    mut commands: Commands,
+    mut zombies: Query<(&Transform, &mut Health), With<Zombie>>,
+) {
+    for (mut det_timer, grenade_transform, entity) in grenades.iter_mut() {
+        det_timer.detonation_timer.tick(time.delta());
+        if det_timer.detonation_timer.finished() {
+            commands.entity(entity).despawn();
+            for (zombie_trans, mut zombie_health) in zombies.iter_mut() {
+                if zombie_trans.translation.distance(grenade_transform.translation) < 50.0 {
+                    zombie_health.health_points -= 10;
+                }
+            }
+        }
+    }
+}
+
+
+pub fn player_throw_grenade(
+    mut commands: Commands,
+    input: Res<Input<KeyCode>>,
+    mouse_pos: Res<MouseLoc>,
+    player_pos: Query<&Transform, With<Player>>,
+    asset_server: Res<AssetServer>,
+) {
+    if input.just_pressed(KeyCode::G) { 
+                if let Ok(player_position) = player_pos.get_single() {
+
+                    let bullet_velocity = (mouse_pos.loc - player_position.translation.truncate()).normalize();
+                    let angle = bullet_velocity.y.atan2(bullet_velocity.x);
+                    commands.spawn(GrenadeBundle {
+                        sprite_bundle: SpriteBundle {
+                            transform: Transform {
+                                translation: Vec3::from_array([
+                                    player_position.translation.x + bullet_velocity.x * 8.0,
+                                    player_position.translation.y + bullet_velocity.y * 10.0,
+                                    0.0,
+                                ]),
+                                rotation: Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle),
+                                ..Default::default()
+                            },
+                            texture: asset_server.load("granade.png"),
+                            ..Default::default()
+                        },
+                        collider_bundle: ColliderBundle {
+                            collider: Collider::cuboid(0.5, 1.5),
+                            rigid_body: RigidBody::Dynamic,
+                            velocity: Velocity::linear(bullet_velocity * 100.0),
+                            ..Default::default()
+                        }, 
+                        timer: DetonationTimer {detonation_timer: Timer::from_seconds(2.0, TimerMode::Once) }, 
+                        grenade: Grenade, 
+                    });
+
+                }
+    }
+}
+
+
 pub fn despawn_zombie(
     mut commands: Commands, 
-    mut zombie_query: Query<(&mut Health, Entity), With<Zombie>>
+    zombie_query: Query<(&mut Health, Entity), With<Zombie>>
 ) {
     for (health, zombie) in zombie_query.iter() {
         if health.health_points == 0 {
@@ -155,7 +219,8 @@ pub fn despawn_zombie(
 
 pub fn bullet_collisions(
     mut bullet_collisions: EventReader<CollisionEvent>, 
-    mut zombie_query: Query<(&mut Health, Entity), With<Zombie>>,
+    mut zombie_query: Query<(&mut Health, Entity, &mut Velocity, &Transform), With<Zombie>>,
+    bullet_query: Query<(&Transform, Entity), With<Bullet>>,
     mut commands: Commands,
 ){
     for bullet in bullet_collisions.iter(){
@@ -163,15 +228,37 @@ pub fn bullet_collisions(
         let b = bullet.to_owned();
         match b {
             CollisionEvent::Started(e1, e2, _) => {
-                for (mut health, entity) in zombie_query.iter_mut() {
-                    if entity.eq(&e1){
-                        commands.entity(e2).despawn();
-                        health.health_points -= 1;
-                        println!("Entity: {:?} took 1 dmg and now has: {:?}", commands.entity(entity).id(), health.health_points);
+                for (bullet_transform, bullet_entity) in bullet_query.iter() {
+                    for (mut health, zombie_entity, mut zombie_vel, zombie_transform) in zombie_query.iter_mut() {
+
+                        if bullet_entity.eq(&e2) {
+                            commands.entity(e2).despawn();
+                            if zombie_entity.eq(&e1){
+                                health.health_points -= 1;
+                                println!("Entity: {:?} took 1 dmg and now has: {:?}", commands.entity(zombie_entity).id(), health.health_points);
+
+                                zombie_vel.linvel += (bullet_transform.translation + zombie_transform.translation)
+                                    .truncate()
+                                    .normalize()
+                                    * 500.0;
+                            }
+                        } else if bullet_entity.eq(&e1) {
+                            commands.entity(e1).despawn();
+                            if zombie_entity.eq(&e2){
+                                health.health_points -= 1;
+                                println!("Entity: {:?} took 1 dmg and now has: {:?}", commands.entity(zombie_entity).id(), health.health_points);
+
+                                zombie_vel.linvel += (bullet_transform.translation + zombie_transform.translation)
+                                    .truncate()
+                                    .normalize()
+                                    * 500.0;
+                            }
+                        }
                     }
                 }
+                
             }, 
-            CollisionEvent::Stopped(e1, e2, _) => {
+            CollisionEvent::Stopped(_e1, _e2, _) => {
              
             }
         }
@@ -246,10 +333,10 @@ pub fn spawn_player(
                     });
                 }
             }
-            AssetEvent::Modified { handle } => {
+            AssetEvent::Modified { handle: _} => {
                 // an image was modified
             }
-            AssetEvent::Removed { handle } => {
+            AssetEvent::Removed { handle: _} => {
                 // an image was unloaded
             }
         }
