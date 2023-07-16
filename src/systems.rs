@@ -1,7 +1,7 @@
 use crate::components::*;
 use bevy::{prelude::*, transform::commands};
 use bevy_ecs_ldtk::prelude::*;
-use bevy_rapier2d::prelude::*;
+use bevy_rapier2d::{prelude::*, na::ComplexField};
 
 use std::collections::{HashMap, HashSet};
 
@@ -211,7 +211,7 @@ pub fn despawn_zombie(
     zombie_query: Query<(&mut Health, Entity), With<Zombie>>
 ) {
     for (health, zombie) in zombie_query.iter() {
-        if health.health_points == 0 {
+        if health.health_points <= 0 {
             commands.entity(zombie).despawn();
         }
     }
@@ -515,6 +515,8 @@ pub fn camera_fit_inside_current_level(
     >,
     level_selection: Res<LevelSelection>,
     ldtk_levels: Res<Assets<LdtkLevel>>,
+    mouse_pos: Res<MouseLoc>,
+    player_pos: Query<&Transform, With<Player>>,
 ) {
     if let Ok(Transform {
         translation: player_translation,
@@ -535,15 +537,22 @@ pub fn camera_fit_inside_current_level(
                     let width = height * ASPECT_RATIO;
                     orthographic_projection.scaling_mode =
                         bevy::render::camera::ScalingMode::Fixed { width, height };
-                    camera_transform.translation.x =
-                        (player_translation.x - level_transform.translation.x - width / 2.)
-                            .clamp(0., level.px_wid as f32 - width);
-                    camera_transform.translation.y =
-                        (player_translation.y - level_transform.translation.y - height / 2.)
-                            .clamp(0., level.px_hei as f32 - height);
 
-                    camera_transform.translation.x += level_transform.translation.x;
-                    camera_transform.translation.y += level_transform.translation.y;
+                    if let Ok(player_position) = player_pos.get_single() {
+                        let camera_pos_offset = (mouse_pos.loc - player_position.translation.truncate()).normalize();
+                        let distance = mouse_pos.loc.distance(player_position.translation.truncate()) ;
+
+                        camera_transform.translation.x =
+                            (player_translation.x - level_transform.translation.x - width / 2. + camera_pos_offset.x * distance / 5.0)
+                                .clamp(0., level.px_wid as f32 - width);
+                        camera_transform.translation.y =
+                            (player_translation.y - level_transform.translation.y - height / 2. + camera_pos_offset.y * distance / 5.0)
+                                .clamp(0., level.px_hei as f32 - height);
+
+
+                        camera_transform.translation.x += level_transform.translation.x;
+                        camera_transform.translation.y += level_transform.translation.y;
+                    }
                 }
             }
         }
