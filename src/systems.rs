@@ -2,8 +2,9 @@ use crate::components::*;
 use bevy::{prelude::*, transform::commands};
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::{prelude::*, na::ComplexField};
+use std::{collections::{HashMap, HashSet}, vec};
 
-use std::collections::{HashMap, HashSet};
+use crate::graphics::*;
 
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let camera = Camera2dBundle::default();
@@ -35,6 +36,19 @@ pub fn mouse_movement_updating_system(
             }
         }
     }
+}
+
+pub fn draw_line_to_pointer(
+    mouse_pos: ResMut<MouseLoc>,
+    mut player_pos: Query<(&mut Transform, &Collider), With<Player>>,
+    shadow_casters: Query<&Collider, With<ShadowCaster>>,
+){
+    if let Ok((player_transform, player_col)) = player_pos.get_single() {
+        player_col.cast_ray(Vec2::from_array([0.0,0.0]), 0.0, Vec2::from_array([0.0,0.0]), mouse_pos.loc, 0.0, true);
+    }
+    // for collider in shadow_casters.iter() {
+    //     collider.cast_ray(translation, rotation, ray_origin, ray_dir, max_toi, solid)
+    // }
 }
 
 pub fn rotate_player(
@@ -277,6 +291,18 @@ pub fn player_movement(input: Res<Input<KeyCode>>, mut query: Query<&mut Velocit
     }
 }
 
+pub fn spawn_buddy(
+    mut commands: Commands, 
+    mouse_pos: Res<MouseLoc>,
+    input: Res<Input<KeyCode>>,
+    characters: Res<CharacterSheet>,
+){
+    if input.just_pressed(KeyCode::B) {
+        spawn_player_sprite(&mut commands, &characters, Vec3::new(mouse_pos.loc.x.clone(), mouse_pos.loc.y.clone(), 0.0));
+    }
+}
+
+
 pub fn spawn_player(
     mut commands: Commands,
     mut ev_asset: EventReader<AssetEvent<Image>>,
@@ -284,6 +310,7 @@ pub fn spawn_player(
     spawn_query: Query<&GridCoords, With<Spawn>>,
     player_query: Query<Entity, With<Player>>,
     assets: Res<Assets<Image>>,
+    characters: Res<CharacterSheet>
 ) {
     for ev in ev_asset.iter() {
         match ev {
@@ -305,14 +332,15 @@ pub fn spawn_player(
 
                     spawn_query.for_each(|cords| {
                         println!("1Spawning player at cords: x:{}, y:{}", cords.x, cords.y);
-                        commands.spawn((PlayerBundle {
-                            sprite_bundle: SpriteBundle {
+                        commands.spawn(PlayerBundle {
+                            sprite_bundle: SpriteSheetBundle {
                                 transform: Transform::from_xyz(
                                     (cords.x * 16 + 8) as f32,
                                     (cords.y * 16 + 8) as f32,
                                     0.0,
                                 ),
-                                texture: asset_server.load("player2.png"),
+                                sprite: TextureAtlasSprite::new(characters.run_animation[0]),
+                                texture_atlas: characters.handle.clone(),
                                 visibility: Visibility::Visible,
                                 ..default()
                             },
@@ -329,7 +357,11 @@ pub fn spawn_player(
                             weapon: Weapon{
                                 ..Default::default()},
                             ..Default::default()
-                        },));
+                        }).insert(FrameAnimation{
+                                timer: Timer::from_seconds(0.2, TimerMode::Repeating),
+                                frames: characters.run_animation.to_vec(),
+                                current_frame: 0
+                        });
                     });
                 }
             }
@@ -365,6 +397,25 @@ pub fn spawn_wall_collision(
         top: i32,
         bottom: i32,
     }
+
+    struct Edge{
+        sx: f32, 
+        sy: f32, 
+        ex: f32, 
+        ey: f32,
+    }
+
+    #[derive(Copy, Clone)]
+    struct Cell {
+        edge_id: [u32; 4], 
+        edge_exist: [bool; 4],
+        exist: bool
+    }
+
+    let NORTH = 0;
+    let SOUTH = 1;
+    let EAST = 2;
+    let WEST = 3;
 
     //println!("{:?}",wall_query);
 
@@ -433,6 +484,38 @@ pub fn spawn_wall_collision(
                     plate_stack.push(row_plates);
                 }
 
+                //edges for shadows
+                // let mut vec_edges: Vec<Edge> = vec![];
+                // vec_edges.clear();
+                // let mut cells = vec![vec![Cell{edge_id: [0,0,0,0], edge_exist: [false, false, false, false], exist: false}; (width+1).try_into().unwrap()]; (height+1).try_into().unwrap()];
+                // for y in 0..height {
+                //     for x in 0..width + 1 {
+                //         let i = &GridCoords{x: x, y: y};
+                //         let n = &GridCoords{x: x, y: y + 1};
+                //         let s = &GridCoords{x: x, y: y - 1};
+                //         let e = &GridCoords{x: x + 1, y: y};
+                //         let w = &GridCoords{x: x - 1, y: y};
+                        
+                //         match level_walls.contains(i) {
+                //             true => {
+                //                 if !level_walls.contains(w) {
+                //                     let ix: usize = (x-1).try_into().unwrap();
+                //                     let iy: usize = y.try_into().unwrap();
+                //                     if cells[ix][iy].edge_exist[WEST] {
+                //                         let edgei: usize = cells[ix][iy].edge_id[NORTH].try_into().unwrap();
+                //                         vec_edges[edgei].ey += 16.0;
+                //                         cells[ix][iy].edge_id[WEST] = cells[ix][iy].edge_id[NORTH];
+                //                         cells[ix][iy].edge_exist[WEST] = true;
+                //                     }
+                //                 }
+                //             }
+                //             false => {
+
+                //             }
+                //         }
+                //     }
+                // }
+
                 // combine "plates" into rectangles across multiple rows
                 let mut rect_builder: HashMap<Plate, Rect> = HashMap::new();
                 let mut prev_row: Vec<Plate> = Vec::new();
@@ -489,7 +572,8 @@ pub fn spawn_wall_collision(
                                     / 2.,
                                 0.,
                             ))
-                            .insert(GlobalTransform::default());
+                            .insert(GlobalTransform::default())
+                            .insert(ShadowCaster);
                     }
                 });
             }

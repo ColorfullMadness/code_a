@@ -5,6 +5,9 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 mod components;
 mod systems;
+mod graphics;
+
+use graphics::GraphicsPlugin;
 
 use systems::*;
 
@@ -14,6 +17,7 @@ fn main() {
         .add_plugin(LdtkPlugin)
         .add_plugin(WorldInspectorPlugin::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
+        .add_plugin(GraphicsPlugin)
         // Required to prevent race conditions between bevy_ecs_ldtk's and bevy_rapier's systems
         .configure_set(LdtkSystemSet::ProcessApi.before(PhysicsSet::SyncBackend))
         .insert_resource(RapierConfiguration {
@@ -32,6 +36,7 @@ fn main() {
         .add_startup_system(setup)
         //.add_system(coursor_pos)
         .add_system(bullet_collisions)
+        .add_system(spawn_buddy)
         .add_system(player_reload)
         .add_system(mouse_movement_updating_system)
         .add_system(rotate_player)
@@ -47,7 +52,7 @@ fn main() {
         .add_system(camera_fit_inside_current_level)
         .register_ldtk_int_cell::<components::WallBundle>(1)
         .register_ldtk_int_cell::<components::SpawnBundle>(2)
-        .register_ldtk_entity::<components::PlayerBundle>("Player")
+        //.register_ldtk_entity::<components::PlayerBundle>("Player")
         .register_ldtk_entity::<components::ZombieBundle>("Zombie")
         .run();
 }

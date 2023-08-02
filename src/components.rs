@@ -25,17 +25,17 @@ pub struct MainCamera;
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
 pub struct Player;
 
-#[derive(Clone, Default, Bundle, LdtkEntity)]
+#[derive(Clone, Default, Bundle)]
 pub struct PlayerBundle {
-    #[sprite_bundle("player.png")]
+    //#[sprite_bundle("player.png")]
     #[bundle]
-    pub sprite_bundle: SpriteBundle,
-    #[from_entity_instance]
+    pub sprite_bundle: SpriteSheetBundle,
+    //#[from_entity_instance]
     #[bundle]
     pub collider_bundle: ColliderBundle,
     pub player: Player,
     pub weapon: Weapon, 
-    #[worldly]
+    //#[worldly]
     pub worldly: Worldly,
 
     // Build Items Component manually by using `impl From<&EntityInstance>`
@@ -43,7 +43,7 @@ pub struct PlayerBundle {
     //items: Items,
 
     // The whole EntityInstance can be stored directly as an EntityInstance component
-    #[from_entity_instance]
+    //#[from_entity_instance]
     pub entity_instance: EntityInstance,
 }
 
@@ -136,6 +136,9 @@ impl Default for Health{
 //         )
 //     }
 // }
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
+pub struct ShadowCaster;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
 pub struct Bullet;
