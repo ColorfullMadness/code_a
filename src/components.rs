@@ -121,7 +121,7 @@ pub struct Health {
 impl Default for Health{
     fn default() -> Self {
         Self {
-            health_points: 10,
+            health_points: 2,
         }
     }
 }

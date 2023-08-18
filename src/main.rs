@@ -1,4 +1,6 @@
-use bevy::prelude::*;
+use std::cell::Cell;
+
+use bevy::{prelude::*};
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
@@ -33,6 +35,8 @@ fn main() {
             ..Default::default()
         }) 
         .insert_resource(MouseLoc{ loc: Vec2::ZERO})
+        .insert_resource(Edges{edges: vec![Edge {sx: 0.0, sy: 0.0, ex: 0.0, ey: 0.0}]})
+        //.insert_resource(Cells{ cells: vec![vec![Cell{edge_id: [0,0,0,0], edge_exist: [false, false, false, false], exist: false}; (width+1).try_into().unwrap()]; (height+1).try_into().unwrap()] })
         .add_startup_system(setup)
         //.add_system(coursor_pos)
         .add_system(bullet_collisions)
@@ -48,6 +52,7 @@ fn main() {
         .add_system(player_throw_grenade)
         .add_system(blow_up_granade)
         .add_system(despawn_zombie)
+        .add_system(calculate_visibility_polygon)
         //.add_system(move_bullets)
         .add_system(camera_fit_inside_current_level)
         .register_ldtk_int_cell::<components::WallBundle>(1)

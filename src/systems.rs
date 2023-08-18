@@ -1,8 +1,9 @@
 use crate::components::*;
-use bevy::{prelude::*, transform::commands};
+use bevy::{prelude::{*, system_adapter::new}, transform::commands, ecs::system::Command};
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::{prelude::*, na::ComplexField};
 use std::{collections::{HashMap, HashSet}, vec};
+use libm::{self, Libm};
 
 use crate::graphics::*;
 
@@ -312,23 +313,23 @@ pub fn spawn_player(
     assets: Res<Assets<Image>>,
     characters: Res<CharacterSheet>
 ) {
-    for ev in ev_asset.iter() {
-        match ev {
-            AssetEvent::Created { handle } => {
-                println!("Handle:{:?}", handle);
+    //for ev in ev_asset.iter() {
+        //match ev {
+            //AssetEvent::Created { handle } => {
+                //println!("Handle:{:?}", handle);
 
-                let eeeeee: Handle<Image> = asset_server.load("player2.png");
-                println!("Player sprite handle: {:?}", eeeeee);
+                //let eeeeee: Handle<Image> = asset_server.load("player2.png");
+                //println!("Player sprite handle: {:?}", eeeeee);
 
-                if player_query.is_empty() && handle.id() == eeeeee.id() {
+                if player_query.is_empty() {
                     println!("Creating players");
                     println!("{:?}", spawn_query);
 
-                    let player = assets.get(handle).unwrap();
-                    let player_height = player.texture_descriptor.size.height as f32 * 0.5;
-                    let player_width = player.texture_descriptor.size.width as f32 * 0.5;
+                    //let player = assets.get(handle).unwrap();
+                    //let player_height = player.texture_descriptor.size.height as f32 * 0.5;
+                    //let player_width = player.texture_descriptor.size.width as f32 * 0.5;
 
-                    println!("Height: {}, Width: {}", player_height, player_width);
+                    //println!("Height: {}, Width: {}", player_height, player_width);
 
                     spawn_query.for_each(|cords| {
                         println!("1Spawning player at cords: x:{}, y:{}", cords.x, cords.y);
@@ -345,7 +346,7 @@ pub fn spawn_player(
                                 ..default()
                             },
                             collider_bundle: ColliderBundle {
-                                collider: Collider::cuboid(player_width, player_height),
+                                collider: Collider::cuboid(5.0, 5.0),
                                 rigid_body: RigidBody::Dynamic,
                                 friction: Friction {
                                     coefficient: 0.0,
@@ -365,15 +366,139 @@ pub fn spawn_player(
                     });
                 }
             }
-            AssetEvent::Modified { handle: _} => {
+            //AssetEvent::Modified { handle: _} => {
                 // an image was modified
-            }
-            AssetEvent::Removed { handle: _} => {
+            //}
+            //AssetEvent::Removed { handle: _} => {
                 // an image was unloaded
+            //}
+//}
+   // }
+//}
+
+#[derive(Resource)]
+pub struct Edges {
+    pub edges: Vec<Edge>,
+}
+
+#[derive(Resource)]
+pub struct Polygons {
+    pub visibility_points: Vec<(f32, f32, f32)>,     
+}
+
+ #[derive(Default,Debug)]
+    pub struct Edge{
+        pub sx: f32, 
+        pub sy: f32, 
+        pub ex: f32, 
+        pub ey: f32,
+    }
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct Cell {
+        edge_id: [u32; 4], 
+        edge_exist: [bool; 4]
+    }
+
+#[derive(Resource)]
+pub struct Cells {
+    pub cells: Vec<Vec<Cell>>,
+    //pub cells: vec![vec![Cell{edge_id: [0,0,0,0], edge_exist: [false, false, false, false], exist: false}; (width+1).try_into().unwrap()]; (height+1).try_into().unwrap()],
+}
+
+pub fn calculate_visibility_polygon(
+    player_pos: Query<&Transform, With<Player>>,
+    edges: Res<Edges>,
+    mut commands: Commands,
+    mouse_pos: Res<MouseLoc>,
+    asset_server: Res<AssetServer>
+){
+    let mut visibility_points:Vec<(f32, f32, f32)> = vec![]; 
+    visibility_points.clear();
+
+    let ox = mouse_pos.loc.x;
+    let oy = mouse_pos.loc.y; 
+
+    edges.edges.iter().for_each(|edge| {
+        for i in 0..1 {
+            let rdx: f32 = if i == 0 {edge.sx} else {edge.ex} - ox;
+            let rdy: f32 = if i == 0 {edge.sy} else {edge.ey} - oy;
+
+            let base_ang: f32 = Libm::<f32>::atan2(rdy, rdx);
+            let mut ang: f32 = 0.0;
+
+
+            for j in 0..2 {
+                match j {
+                   0 => { ang = base_ang - 0.0001}
+                   1 => { ang = base_ang }
+                   2 => { ang = base_ang + 0.0001}
+                   _ => {}
+                }
+
+                let sdx = 500.0 * Libm::<f32>::cos(ang);
+                let sdy = 500.0 * Libm::<f32>::sin(ang);
+                
+
+                let mut min_t1: f32 = 100000.0;
+                let mut min_px = 0.0;
+                let mut min_py = 0.0;
+                let mut min_ang = 0.0; 
+                let mut valid = false;
+
+                for edge2 in edges.edges.iter() {
+                    let t2 = (rdx * (edge2.sy - oy) + (rdy * (ox - edge2.sx))) / (sdx * rdy - sdy * rdx);
+                    let t1 = (edge2.sx + sdx * t2 - ox) / rdx;
+
+                    if t1 > 0.0 && t2 >= 0.0 && t2 <=1.0 {
+                        if t1 < min_t1 {
+                            min_t1 = t1;
+                            min_px = ox + rdx * t1;
+                            min_py = oy + rdy * t1;
+                            min_ang = Libm::<f32>::atan2(min_py - oy, min_px - ox);
+                            valid = true;
+                        }
+                    }
+                }
+
+                if valid {
+                    visibility_points.push((min_ang, min_px, min_py));
+                }
             }
         }
-    }
+    });
+
+    visibility_points.sort_by(|(a,px, py),(a1, px1, py1)|{
+        a.total_cmp(a1)
+    });
+
+
+    // visibility_points.iter().for_each(|point| {commands.spawn(
+    //     SpriteBundle{
+    //         texture: asset_server.load("point_found.png"),
+    //         transform: Transform { 
+    //             translation: Vec3::from_array([point.1, point.2, 0.0]),
+    //             ..Default::default()
+    //         },
+    //         ..Default::default()
+    //     });
+    // });
+
+    commands.insert_resource(Polygons {visibility_points: visibility_points});
 }
+
+
+// pub fn draw_visibility_polygon(
+//     player_transform: Query<&Transform, With<Player>>,
+//     mut commands: Commands, 
+//     mut visibility_points: Res<Polygons>
+// ){
+//     let n_rays_cast: i32 = visibility_points.visibility_points.len() as i32;
+
+
+
+// }
+
 
 pub fn spawn_wall_collision(
     mut commands: Commands,
@@ -381,6 +506,7 @@ pub fn spawn_wall_collision(
     parent_query: Query<&Parent, Without<Wall>>,
     level_query: Query<(Entity, &Handle<LdtkLevel>)>,
     levels: Res<Assets<LdtkLevel>>,
+    asset_server: Res<AssetServer>
 ) {
     /// Represents a wide wall that is 1 tile tall
     /// Used to spawn wall collisions
@@ -398,19 +524,20 @@ pub fn spawn_wall_collision(
         bottom: i32,
     }
 
-    struct Edge{
-        sx: f32, 
-        sy: f32, 
-        ex: f32, 
-        ey: f32,
-    }
+    // #[derive(Default)]
+    // struct Edge{
+    //     sx: f32, 
+    //     sy: f32, 
+    //     ex: f32, 
+    //     ey: f32,
+    // }
 
-    #[derive(Copy, Clone)]
-    struct Cell {
-        edge_id: [u32; 4], 
-        edge_exist: [bool; 4],
-        exist: bool
-    }
+    // #[derive(Copy, Clone)]
+    // struct Cell {
+    //     edge_id: [u32; 4], 
+    //     edge_exist: [bool; 4],
+    //     exist: bool
+    // }
 
     let NORTH = 0;
     let SOUTH = 1;
@@ -447,6 +574,8 @@ pub fn spawn_wall_collision(
                     .get(level_handle)
                     .expect("Level should be loaded by this point");
 
+
+
                 let LayerInstance {
                     c_wid: width,
                     c_hei: height,
@@ -457,6 +586,141 @@ pub fn spawn_wall_collision(
                     .layer_instances
                     .clone()
                     .expect("Level asset should have layers")[0];
+
+                //edges for shadows
+                let mut vec_edges: Vec<Edge> = vec![];
+                vec_edges.clear();
+                let mut cells = vec![vec![Cell{edge_id: [0,0,0,0], edge_exist: [false, false, false, false]}; (width+1).try_into().unwrap()]; (height+1).try_into().unwrap()];
+                println!("Width: {}, Height: {}", width, height);
+                for y in 0..height {
+                    for x in 0..width + 1 {
+                        let i = &GridCoords{x: x, y: y};
+                        let n = &GridCoords{x: x, y: y - 1};
+                        let s = &GridCoords{x: x, y: y + 1};
+                        let e = &GridCoords{x: x + 1, y: y};
+                        let w = &GridCoords{x: x - 1, y: y};
+                         
+                        match level_walls.contains(i) {
+                            true => {
+                                let yi: usize = y.try_into().unwrap_or_default();
+                                let xi: usize = x.try_into().unwrap_or_default();
+                                if !level_walls.contains(w) {
+                                    let ix: usize = (x).try_into().unwrap();
+                                    let iy: usize = (y-1).try_into().unwrap_or_default();
+                                    if cells[iy][ix].edge_exist[WEST] {
+                                        let edgei: usize = cells[iy][ix].edge_id[WEST].try_into().unwrap();
+                                        vec_edges[edgei].ey += 16.0;
+                                        cells[yi][xi].edge_id[WEST] = cells[iy][ix].edge_id[WEST];
+                                        cells[yi][xi].edge_exist[WEST] = true;
+                                    } else {
+                                        let edge = Edge {
+                                            sx: (x as f32) * 16.0,
+                                            sy: y as f32 * 16.0,
+                                            ex: x as f32 * 16.0,
+                                            ey: (y as f32 ) * 16.0 + 16.0
+                                        };
+                                        let edge_id = vec_edges.len();
+                                        vec_edges.push(edge);
+
+                                        cells[yi][xi].edge_id[WEST] = edge_id as u32;
+                                        cells[yi][xi].edge_exist[WEST] = true;
+                                    }
+                                } 
+                                if !level_walls.contains(e) {
+                                    let ix: usize = (x).try_into().unwrap();
+                                    let iy: usize = (y-1).try_into().unwrap_or_default();
+                                    if cells[iy][ix].edge_exist[EAST] {
+                                        let edgeid: usize = cells[iy][ix].edge_id[EAST].try_into().unwrap();
+                                        vec_edges[edgeid].ey += 16.0;
+                                        cells[yi][xi].edge_id[EAST] = cells[iy][ix].edge_id[EAST];
+                                        cells[yi][xi].edge_exist[EAST] = true;
+                                    } else {
+                                        let edge = Edge {
+                                            sx: (x as f32 + 1.0) * 16.0,
+                                            sy: y as f32 * 16.0,
+                                            ex: (x as f32 + 1.0) * 16.0,
+                                            ey: y as f32 * 16.0 + 16.0
+                                        };
+                                        let edge_id = vec_edges.len();
+                                        vec_edges.push(edge);
+
+                                        cells[yi][xi].edge_id[EAST] = edge_id as u32;
+                                        cells[yi][xi].edge_exist[EAST] = true;
+                                    }
+                                } 
+                                if !level_walls.contains(n) {
+                                    let ix: usize = (x-1).try_into().unwrap_or_default();
+                                    let iy: usize = (y).try_into().unwrap();
+                                    if cells[iy][ix].edge_exist[NORTH] {
+                                        let edgei: usize = cells[iy][ix].edge_id[NORTH].try_into().unwrap();
+                                        vec_edges[edgei].ex += 16.0;
+                                        cells[yi][xi].edge_id[NORTH] = cells[iy][ix].edge_id[NORTH];
+                                        cells[yi][xi].edge_exist[NORTH] = true;
+                                    } else {
+                                        let edge = Edge {
+                                            sx: (x as f32) * 16.0,
+                                            sy: (y as f32) * 16.0,
+                                            ex: x as f32 * 16.0 + 16.0,
+                                            ey: (y as f32) * 16.0
+                                        };
+                                        let edge_id = vec_edges.len();
+                                        vec_edges.push(edge);
+
+                                        cells[yi][xi].edge_id[NORTH] = edge_id as u32;
+                                        cells[yi][xi].edge_exist[NORTH] = true;
+                                    }
+                                }
+                                if !level_walls.contains(s) {
+                                    let ix: usize = (x-1).try_into().unwrap_or_default();
+                                    let iy: usize = (y).try_into().unwrap();
+                                    if cells[iy][ix].edge_exist[SOUTH] {
+                                        let edgei: usize = cells[iy][ix].edge_id[SOUTH].try_into().unwrap();
+                                        vec_edges[edgei].ex += 16.0;
+                                        cells[yi][xi].edge_id[SOUTH] = cells[iy][ix].edge_id[SOUTH];
+                                        cells[yi][xi].edge_exist[SOUTH] = true;
+                                    } else {
+                                        let edge = Edge {
+                                            sx: x as f32 * 16.0,
+                                            sy: (y as f32 + 1.0) * 16.0,
+                                            ex: x as f32 * 16.0 + 16.0,
+                                            ey: (y as f32 + 1.0) * 16.0
+                                        };
+                                        let edge_id = vec_edges.len();
+                                        vec_edges.push(edge);
+
+                                        cells[yi][xi].edge_id[SOUTH] = edge_id as u32;
+                                        cells[yi][xi].edge_exist[SOUTH] = true;
+                                    }
+                                }
+                            }
+                            false => {
+                            }
+                        }
+                    }
+                }
+                vec_edges.iter().for_each(|edge| {
+                        commands.spawn(SpriteBundle{
+                            texture: asset_server.load("point_e.png"),
+                            transform: Transform { 
+                                translation: Vec3::from_array([edge.ex, edge.ey, 0.0]),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        });
+
+                        commands.spawn(SpriteBundle{
+                            texture: asset_server.load("point.png"),
+                            transform: Transform { 
+                                translation: Vec3::from_array([edge.sx, edge.sy, 1.0]),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        });
+                });
+
+                commands.insert_resource(Edges{edges: vec_edges});
+                println!("Added edges ");
+
 
                 // combine wall tiles into flat "plates" in each individual row
                 let mut plate_stack: Vec<Vec<Plate>> = Vec::new();
@@ -483,38 +747,6 @@ pub fn spawn_wall_collision(
 
                     plate_stack.push(row_plates);
                 }
-
-                //edges for shadows
-                // let mut vec_edges: Vec<Edge> = vec![];
-                // vec_edges.clear();
-                // let mut cells = vec![vec![Cell{edge_id: [0,0,0,0], edge_exist: [false, false, false, false], exist: false}; (width+1).try_into().unwrap()]; (height+1).try_into().unwrap()];
-                // for y in 0..height {
-                //     for x in 0..width + 1 {
-                //         let i = &GridCoords{x: x, y: y};
-                //         let n = &GridCoords{x: x, y: y + 1};
-                //         let s = &GridCoords{x: x, y: y - 1};
-                //         let e = &GridCoords{x: x + 1, y: y};
-                //         let w = &GridCoords{x: x - 1, y: y};
-                        
-                //         match level_walls.contains(i) {
-                //             true => {
-                //                 if !level_walls.contains(w) {
-                //                     let ix: usize = (x-1).try_into().unwrap();
-                //                     let iy: usize = y.try_into().unwrap();
-                //                     if cells[ix][iy].edge_exist[WEST] {
-                //                         let edgei: usize = cells[ix][iy].edge_id[NORTH].try_into().unwrap();
-                //                         vec_edges[edgei].ey += 16.0;
-                //                         cells[ix][iy].edge_id[WEST] = cells[ix][iy].edge_id[NORTH];
-                //                         cells[ix][iy].edge_exist[WEST] = true;
-                //                     }
-                //                 }
-                //             }
-                //             false => {
-
-                //             }
-                //         }
-                //     }
-                // }
 
                 // combine "plates" into rectangles across multiple rows
                 let mut rect_builder: HashMap<Plate, Rect> = HashMap::new();
