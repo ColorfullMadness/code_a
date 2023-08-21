@@ -1,6 +1,7 @@
-use std::time::Duration;
+
 
 use bevy::prelude::*;
+use bevy_inspector_egui::egui::Frame;
 
 
 pub struct GraphicsPlugin;
@@ -9,9 +10,17 @@ pub struct GraphicsPlugin;
 pub struct CharacterSheet {
     pub handle: Handle<TextureAtlas>, 
     pub run_animation: [usize; 4],
+    pub talk_animation: [usize; 3]
 }
 
-#[derive(Component)]
+//TODO add animation enum for easier code readabiliyt
+#[derive(Component, Debug)]
+pub struct Animations {
+    pub animations: Vec<FrameAnimation>,
+    pub current_animation: usize
+}
+
+#[derive(Component, Debug)]
 pub struct FrameAnimation {
     pub timer: Timer, 
     pub frames: Vec<usize>,
@@ -60,19 +69,25 @@ impl GraphicsPlugin {
         commands.insert_resource(CharacterSheet {
             handle: atlas_handle,
             run_animation: [13*8, 13*8+1, 13*8+2, 13*8+3],
+            talk_animation: [10*8, 10*8+1, 10*8+2]
         });
     }
 
     fn frame_animation(
-        mut sprites_query: Query<(&mut TextureAtlasSprite, &mut FrameAnimation)>,
+        mut sprites_query: Query<(&mut TextureAtlasSprite, &mut Animations)>,
         time: Res<Time>, 
     ){
-        for (mut sprite, mut animation) in  sprites_query.iter_mut(){
-            animation.timer.tick(time.delta());
-            if animation.timer.just_finished() {
-                animation.current_frame = (animation.current_frame + 1) % animation.frames.len();
-                sprite.index = animation.frames[animation.current_frame];
+        for (mut sprite, mut animations) in  sprites_query.iter_mut(){
+            //let mut animation = animations.animations[animations.current_animation];
+            let current = animations.current_animation;
+            dbg!(current);
+            animations.animations[current].timer.tick(time.delta());
+            if animations.animations[current].timer.just_finished() {
+                animations.animations[current].current_frame = (animations.animations[current].current_frame + 1) % animations.animations[current].frames.len();
+                sprite.index = animations.animations[current].frames[animations.animations[current].current_frame];
             }
         }
     }
+
+
 }

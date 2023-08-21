@@ -1,4 +1,4 @@
-use std::cell::Cell;
+
 
 use bevy::{prelude::*};
 use bevy_ecs_ldtk::prelude::*;
@@ -53,6 +53,7 @@ fn main() {
         .add_system(blow_up_granade)
         .add_system(despawn_zombie)
         .add_system(calculate_visibility_polygon)
+        .add_system(talk)
         //.add_system(move_bullets)
         .add_system(camera_fit_inside_current_level)
         .register_ldtk_int_cell::<components::WallBundle>(1)

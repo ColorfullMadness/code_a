@@ -1,5 +1,5 @@
 use crate::components::*;
-use bevy::{prelude::{*, system_adapter::new}, transform::commands, ecs::system::Command};
+use bevy::{prelude::{*}};
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::{prelude::*, na::ComplexField};
 use std::{collections::{HashMap, HashSet}, vec};
@@ -41,10 +41,10 @@ pub fn mouse_movement_updating_system(
 
 pub fn draw_line_to_pointer(
     mouse_pos: ResMut<MouseLoc>,
-    mut player_pos: Query<(&mut Transform, &Collider), With<Player>>,
-    shadow_casters: Query<&Collider, With<ShadowCaster>>,
+    player_pos: Query<(&mut Transform, &Collider), With<Player>>,
+    _shadow_casters: Query<&Collider, With<ShadowCaster>>,
 ){
-    if let Ok((player_transform, player_col)) = player_pos.get_single() {
+    if let Ok((_player_transform, player_col)) = player_pos.get_single() {
         player_col.cast_ray(Vec2::from_array([0.0,0.0]), 0.0, Vec2::from_array([0.0,0.0]), mouse_pos.loc, 0.0, true);
     }
     // for collider in shadow_casters.iter() {
@@ -55,7 +55,7 @@ pub fn draw_line_to_pointer(
 pub fn rotate_player(
     mouse_pos: ResMut<MouseLoc>,
     mut player_pos: Query<&mut Transform, With<Player>>,
-    mut player_sprite: Query<&mut Sprite, With<Player>>,
+    mut player_sprite: Query<&mut TextureAtlasSprite, With<Player>>,
 ) {
     for transform in &mut player_pos {
         if let Ok(mut sprite) = player_sprite.get_single_mut() {
@@ -280,7 +280,7 @@ pub fn bullet_collisions(
     }
 }
 
-pub fn player_movement(input: Res<Input<KeyCode>>, mut query: Query<&mut Velocity, With<Player>>) {
+pub fn player_movement(input: Res<Input<KeyCode>>, mut query: Query<&mut Velocity, With<Player>>, mut player_anim: Query<&mut Animations, With<Player>>) {
     for mut velocity in &mut query {
         let right = if input.pressed(KeyCode::D) { 1. } else { 0. };
         let left = if input.pressed(KeyCode::A) { 1. } else { 0. };
@@ -289,6 +289,12 @@ pub fn player_movement(input: Res<Input<KeyCode>>, mut query: Query<&mut Velocit
 
         velocity.linvel.x = (right - left) * 150.;
         velocity.linvel.y = (up - down) * 150.;
+
+        if !velocity.eq(&Velocity::zero())  {
+            if let Ok(mut anim) = player_anim.get_single_mut() {
+                anim.current_animation = 0;
+            }
+        }
     }
 }
 
@@ -303,14 +309,27 @@ pub fn spawn_buddy(
     }
 }
 
+pub fn talk(
+    input: Res<Input<KeyCode>>,
+    characters: Res<CharacterSheet>,
+    mut player_anim: Query<&mut Animations, With<Player>>
+){
+    if input.just_pressed(KeyCode::T) {
+        if let Ok(mut animation) = player_anim.get_single_mut() {
+            animation.current_animation = 1;
+            dbg!(animation);
+        }
+    }
+}
+
 
 pub fn spawn_player(
     mut commands: Commands,
-    mut ev_asset: EventReader<AssetEvent<Image>>,
-    asset_server: Res<AssetServer>,
+    _ev_asset: EventReader<AssetEvent<Image>>,
+    _asset_server: Res<AssetServer>,
     spawn_query: Query<&GridCoords, With<Spawn>>,
     player_query: Query<Entity, With<Player>>,
-    assets: Res<Assets<Image>>,
+    _assets: Res<Assets<Image>>,
     characters: Res<CharacterSheet>
 ) {
     //for ev in ev_asset.iter() {
@@ -358,10 +377,20 @@ pub fn spawn_player(
                             weapon: Weapon{
                                 ..Default::default()},
                             ..Default::default()
-                        }).insert(FrameAnimation{
-                                timer: Timer::from_seconds(0.2, TimerMode::Repeating),
-                                frames: characters.run_animation.to_vec(),
-                                current_frame: 0
+                        })
+                        .insert(Animations {
+                                animations: vec![
+                                    FrameAnimation{
+                                        timer: Timer::from_seconds(0.2, TimerMode::Repeating),
+                                        frames: characters.run_animation.to_vec(),
+                                        current_frame: 0,
+                                    },
+                                    FrameAnimation{
+                                        timer: Timer::from_seconds(0.4, TimerMode::Repeating),
+                                        frames: characters.talk_animation.to_vec(),
+                                        current_frame: 0,
+                                    } ],
+                                current_animation: 0,
                         });
                     });
                 }
@@ -407,11 +436,11 @@ pub struct Cells {
 }
 
 pub fn calculate_visibility_polygon(
-    player_pos: Query<&Transform, With<Player>>,
+    _player_pos: Query<&Transform, With<Player>>,
     edges: Res<Edges>,
     mut commands: Commands,
     mouse_pos: Res<MouseLoc>,
-    asset_server: Res<AssetServer>
+    _asset_server: Res<AssetServer>
 ){
     let mut visibility_points:Vec<(f32, f32, f32)> = vec![]; 
     visibility_points.clear();
@@ -468,7 +497,7 @@ pub fn calculate_visibility_polygon(
         }
     });
 
-    visibility_points.sort_by(|(a,px, py),(a1, px1, py1)|{
+    visibility_points.sort_by(|(a,_px, _py),(a1, _px1, _py1)|{
         a.total_cmp(a1)
     });
 
