@@ -12,6 +12,7 @@ mod main_menu;
 
 use game::enemies::EnemyPlugin;
 use game::player::PlayerPlugin;
+use game::ui::GameUIPlugin;
 use main_menu::MainMenuPlugin;
 use resources::MouseLoc;
 use graphics::GraphicsPlugin;
@@ -43,6 +44,7 @@ fn main() {
         .insert_resource(Edges{edges: vec![Edge {sx: 0.0, sy: 0.0, ex: 0.0, ey: 0.0}]})
         .add_state::<AppState>()
         .add_plugin(MainMenuPlugin)
+        .add_plugin(GameUIPlugin)
         .add_plugin(EnemyPlugin)
         .add_plugin(PlayerPlugin)
         .add_startup_system(setup)
@@ -51,7 +53,6 @@ fn main() {
         .add_system(mouse_movement_updating_system)
         .add_system(spawn_wall_collision)
         .add_system(blow_up_granade)
-        .add_system(calculate_visibility_polygon)
         .add_system(camera_fit_inside_current_level)
         .register_ldtk_int_cell::<components::WallBundle>(1)
         .register_ldtk_int_cell::<components::SpawnBundle>(2)

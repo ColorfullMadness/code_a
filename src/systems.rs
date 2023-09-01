@@ -15,7 +15,7 @@ use crate::game::player::components::Player;
 use crate::game::enemies::components::Zombie;
 
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let mut camera = Camera2dBundle::default();
+    let camera = Camera2dBundle::default();
     commands.spawn((camera, MainCamera));
 
     let ldtk_handle = asset_server.load("test.ldtk");
@@ -162,75 +162,6 @@ pub struct Cell {
 #[derive(Resource)]
 pub struct Cells {
     pub cells: Vec<Vec<Cell>>,
-    //pub cells: vec![vec![Cell{edge_id: [0,0,0,0], edge_exist: [false, false, false, false], exist: false}; (width+1).try_into().unwrap()]; (height+1).try_into().unwrap()],
-}
-
-pub fn calculate_visibility_polygon(
-    _player_pos: Query<&Transform, With<Player>>,
-    edges: Res<Edges>,
-    mut commands: Commands,
-    mouse_pos: Res<MouseLoc>,
-    _asset_server: Res<AssetServer>,
-) {
-    let mut visibility_points: Vec<(f32, f32, f32)> = vec![];
-    visibility_points.clear();
-
-    let ox = mouse_pos.loc.x;
-    let oy = mouse_pos.loc.y;
-
-    edges.edges.iter().for_each(|edge| {
-        for i in 0..1 {
-            let rdx: f32 = if i == 0 { edge.sx } else { edge.ex } - ox;
-            let rdy: f32 = if i == 0 { edge.sy } else { edge.ey } - oy;
-
-            let base_ang: f32 = Libm::<f32>::atan2(rdy, rdx);
-            let mut ang: f32 = 0.0;
-
-            for j in 0..2 {
-                match j {
-                    0 => ang = base_ang - 0.0001,
-                    1 => ang = base_ang,
-                    2 => ang = base_ang + 0.0001,
-                    _ => {}
-                }
-
-                let sdx = 500.0 * Libm::<f32>::cos(ang);
-                let sdy = 500.0 * Libm::<f32>::sin(ang);
-
-                let mut min_t1: f32 = 100000.0;
-                let mut min_px = 0.0;
-                let mut min_py = 0.0;
-                let mut min_ang = 0.0;
-                let mut valid = false;
-
-                for edge2 in edges.edges.iter() {
-                    let t2 =
-                        (rdx * (edge2.sy - oy) + (rdy * (ox - edge2.sx))) / (sdx * rdy - sdy * rdx);
-                    let t1 = (edge2.sx + sdx * t2 - ox) / rdx;
-
-                    if t1 > 0.0 && t2 >= 0.0 && t2 <= 1.0 {
-                        if t1 < min_t1 {
-                            min_t1 = t1;
-                            min_px = ox + rdx * t1;
-                            min_py = oy + rdy * t1;
-                            min_ang = Libm::<f32>::atan2(min_py - oy, min_px - ox);
-                            valid = true;
-                        }
-                    }
-                }
-
-                if valid {
-                    visibility_points.push((min_ang, min_px, min_py));
-                }
-            }
-        }
-    });
-
-    visibility_points.sort_by(|(a, _px, _py), (a1, _px1, _py1)| a.total_cmp(a1));
-
-    commands.insert_resource(Polygons {
-        visibility_points: visibility_points,
-    });
 }
 
 pub fn spawn_wall_collision(
@@ -257,10 +188,10 @@ pub fn spawn_wall_collision(
         bottom: i32,
     }
 
-    let NORTH = 0;
-    let SOUTH = 1;
-    let EAST = 2;
-    let WEST = 3;
+    const NORTH: usize = 0;
+    const SOUTH: usize = 1;
+    const EAST: usize = 2;
+    const WEST: usize = 3;
 
     // Consider where the walls are
     // storing them as GridCoords in a HashSet for quick, easy lookup
@@ -301,7 +232,7 @@ pub fn spawn_wall_collision(
                     .clone()
                     .expect("Level asset should have layers")[0];
 
-                //edges for shadows
+                //Edges for shadows
                 let mut vec_edges: Vec<Edge> = vec![];
                 vec_edges.clear();
                 let mut cells = vec![
