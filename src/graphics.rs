@@ -1,6 +1,4 @@
-
-
-use bevy::prelude::*;
+use bevy::{prelude::*, reflect::Enum};
 use bevy_inspector_egui::egui::Frame;
 
 
@@ -17,7 +15,7 @@ pub struct CharacterSheet {
 #[derive(Component, Debug)]
 pub struct Animations {
     pub animations: Vec<FrameAnimation>,
-    pub current_animation: usize
+    pub current_animation: usize,
 }
 
 #[derive(Component, Debug)]
@@ -80,7 +78,6 @@ impl GraphicsPlugin {
         for (mut sprite, mut animations) in  sprites_query.iter_mut(){
             //let mut animation = animations.animations[animations.current_animation];
             let current = animations.current_animation;
-            dbg!(current);
             animations.animations[current].timer.tick(time.delta());
             if animations.animations[current].timer.just_finished() {
                 animations.animations[current].current_frame = (animations.animations[current].current_frame + 1) % animations.animations[current].frames.len();

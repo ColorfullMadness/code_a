@@ -1,14 +1,21 @@
 use crate::components::*;
-use bevy::{prelude::{*}};
+use bevy::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
-use bevy_rapier2d::{prelude::*, na::ComplexField};
-use std::{collections::{HashMap, HashSet}, vec};
+use bevy_rapier2d::prelude::*;
 use libm::{self, Libm};
+use std::{
+    collections::{HashMap, HashSet},
+    vec,
+};
 
 use crate::graphics::*;
 
+use crate::resources::MouseLoc;
+use crate::game::player::components::Player;
+use crate::game::enemies::components::Zombie;
+
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let camera = Camera2dBundle::default();
+    let mut camera = Camera2dBundle::default();
     commands.spawn((camera, MainCamera));
 
     let ldtk_handle = asset_server.load("test.ldtk");
@@ -16,11 +23,6 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         ldtk_handle,
         ..Default::default()
     });
-}
-
-#[derive(Resource)]
-pub struct MouseLoc {
-    pub loc: Vec2,
 }
 
 pub fn mouse_movement_updating_system(
@@ -39,127 +41,6 @@ pub fn mouse_movement_updating_system(
     }
 }
 
-pub fn draw_line_to_pointer(
-    mouse_pos: ResMut<MouseLoc>,
-    player_pos: Query<(&mut Transform, &Collider), With<Player>>,
-    _shadow_casters: Query<&Collider, With<ShadowCaster>>,
-){
-    if let Ok((_player_transform, player_col)) = player_pos.get_single() {
-        player_col.cast_ray(Vec2::from_array([0.0,0.0]), 0.0, Vec2::from_array([0.0,0.0]), mouse_pos.loc, 0.0, true);
-    }
-    // for collider in shadow_casters.iter() {
-    //     collider.cast_ray(translation, rotation, ray_origin, ray_dir, max_toi, solid)
-    // }
-}
-
-pub fn rotate_player(
-    mouse_pos: ResMut<MouseLoc>,
-    mut player_pos: Query<&mut Transform, With<Player>>,
-    mut player_sprite: Query<&mut TextureAtlasSprite, With<Player>>,
-) {
-    for transform in &mut player_pos {
-        if let Ok(mut sprite) = player_sprite.get_single_mut() {
-            //println!("World position: {}/{}", world_position.x, world_position.y);
-            if mouse_pos.loc.x < transform.translation.x && !sprite.flip_x {
-                sprite.flip_x = true;
-            } else if mouse_pos.loc.x > transform.translation.x && sprite.flip_x {
-                sprite.flip_x = false;
-            }
-        }
-    }
-}
-
-pub fn zombie_movement(
-    mut zombie_query: Query<(&mut Velocity, &Transform), With<Zombie>>,
-    player_query: Query<&Transform, With<Player>>,
-) {
-    if let Ok(player_pos) = player_query.get_single() {
-        for (mut zombie_vel, zombie_pos) in zombie_query.iter_mut() {
-            if zombie_pos.translation.distance(player_pos.translation) < 50.0 {
-                zombie_vel.linvel = (player_pos.translation - zombie_pos.translation)
-                    .truncate()
-                    .normalize()
-                    * 50.0;
-            } else {
-                zombie_vel.linvel = Vec2::ZERO;
-            }
-        }
-    }
-}
-
-pub fn player_reload(
-    mut weapon_query: Query<&mut Weapon, With<Player>>,
-    input: Res<Input<KeyCode>>, 
-    time: Res<Time>
-){   
-   
-    if let Ok(mut weapon) = weapon_query.get_single_mut(){
-        if (input.just_pressed(KeyCode::R) || input.pressed(KeyCode::R)) && weapon.ammo.bullets == 0{
-            println!("RELOADING");
-            weapon.reload_timer.reload_timer.tick(time.delta());
-            if weapon.reload_timer.reload_timer.finished() {
-                weapon.ammo.bullets = 30;
-                weapon.reload_timer.reload_timer.reset();
-                println!("RELOADED + 30");
-            }
-        }
-        if input.just_released(KeyCode::R) {
-            weapon.reload_timer.reload_timer.reset();
-        }
-    }
-    
-}
-
-pub fn player_shoot(
-    mut commands: Commands,
-    mouse_input: Res<Input<MouseButton>>,
-    mouse_pos: Res<MouseLoc>,
-    player_pos: Query<&Transform, With<Player>>,
-    asset_server: Res<AssetServer>,
-    mut weapon_query: Query<&mut Weapon, With<Player>>,
-    time: Res<Time>,
-) {
-
-    if mouse_input.pressed(MouseButton::Left) || mouse_input.just_pressed(MouseButton::Left) { 
-        //TODO add different actions for pressed and just pressed
-        if let Ok(mut weapon) = weapon_query.get_single_mut(){
-            weapon.fire_rate.timer.tick(time.delta());
-
-            if weapon.fire_rate.to_owned().timer.finished() && weapon.ammo.bullets != 0{
-                if let Ok(player_position) = player_pos.get_single() {
-
-                    let bullet_velocity = (mouse_pos.loc - player_position.translation.truncate()).normalize();
-                    let angle = bullet_velocity.y.atan2(bullet_velocity.x);
-                    commands.spawn(BulletBundle {
-                        sprite_bundle: SpriteBundle {
-                            transform: Transform {
-                                translation: Vec3::from_array([
-                                    player_position.translation.x + bullet_velocity.x * 8.0,
-                                    player_position.translation.y + bullet_velocity.y * 10.0,
-                                    0.0,
-                                ]),
-                                rotation: Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle),
-                                ..Default::default()
-                            },
-                            texture: asset_server.load("bullet.png"),
-                            ..Default::default()
-                        },
-                        collider_bundle: ColliderBundle {
-                            collider: Collider::cuboid(0.5, 1.5),
-                            rigid_body: RigidBody::Dynamic,
-                            velocity: Velocity::linear(bullet_velocity * 500.0),
-                            ..Default::default()
-                        },
-                        bullet: Bullet {},
-                    }).insert(Sensor).insert(ActiveEvents::COLLISION_EVENTS);
-
-                    weapon.ammo.bullets -= 1;
-                }
-            }
-        }
-    }
-}
-
 pub fn blow_up_granade(
     time: Res<Time>,
     mut grenades: Query<(&mut DetonationTimer, &Transform, Entity), With<Grenade>>,
@@ -171,7 +52,11 @@ pub fn blow_up_granade(
         if det_timer.detonation_timer.finished() {
             commands.entity(entity).despawn();
             for (zombie_trans, mut zombie_health) in zombies.iter_mut() {
-                if zombie_trans.translation.distance(grenade_transform.translation) < 50.0 {
+                if zombie_trans
+                    .translation
+                    .distance(grenade_transform.translation)
+                    < 50.0
+                {
                     zombie_health.health_points -= 10;
                 }
             }
@@ -179,91 +64,49 @@ pub fn blow_up_granade(
     }
 }
 
-
-pub fn player_throw_grenade(
-    mut commands: Commands,
-    input: Res<Input<KeyCode>>,
-    mouse_pos: Res<MouseLoc>,
-    player_pos: Query<&Transform, With<Player>>,
-    asset_server: Res<AssetServer>,
-) {
-    if input.just_pressed(KeyCode::G) { 
-                if let Ok(player_position) = player_pos.get_single() {
-
-                    let bullet_velocity = (mouse_pos.loc - player_position.translation.truncate()).normalize();
-                    let angle = bullet_velocity.y.atan2(bullet_velocity.x);
-                    commands.spawn(GrenadeBundle {
-                        sprite_bundle: SpriteBundle {
-                            transform: Transform {
-                                translation: Vec3::from_array([
-                                    player_position.translation.x + bullet_velocity.x * 8.0,
-                                    player_position.translation.y + bullet_velocity.y * 10.0,
-                                    0.0,
-                                ]),
-                                rotation: Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle),
-                                ..Default::default()
-                            },
-                            texture: asset_server.load("granade.png"),
-                            ..Default::default()
-                        },
-                        collider_bundle: ColliderBundle {
-                            collider: Collider::cuboid(0.5, 1.5),
-                            rigid_body: RigidBody::Dynamic,
-                            velocity: Velocity::linear(bullet_velocity * 100.0),
-                            ..Default::default()
-                        }, 
-                        timer: DetonationTimer {detonation_timer: Timer::from_seconds(2.0, TimerMode::Once) }, 
-                        grenade: Grenade, 
-                    });
-
-                }
-    }
-}
-
-
-pub fn despawn_zombie(
-    mut commands: Commands, 
-    zombie_query: Query<(&mut Health, Entity), With<Zombie>>
-) {
-    for (health, zombie) in zombie_query.iter() {
-        if health.health_points <= 0 {
-            commands.entity(zombie).despawn();
-        }
-    }
-}
-
 pub fn bullet_collisions(
-    mut bullet_collisions: EventReader<CollisionEvent>, 
+    mut bullet_collisions: EventReader<CollisionEvent>,
     mut zombie_query: Query<(&mut Health, Entity, &mut Velocity, &Transform), With<Zombie>>,
     bullet_query: Query<(&Transform, Entity), With<Bullet>>,
     mut commands: Commands,
-){
-    for bullet in bullet_collisions.iter(){
+) {
+    for bullet in bullet_collisions.iter() {
         println!("Received collision event: {:?}", bullet.to_owned());
         let b = bullet.to_owned();
         match b {
             CollisionEvent::Started(e1, e2, _) => {
                 for (bullet_transform, bullet_entity) in bullet_query.iter() {
-                    for (mut health, zombie_entity, mut zombie_vel, zombie_transform) in zombie_query.iter_mut() {
-
+                    for (mut health, zombie_entity, mut zombie_vel, zombie_transform) in
+                        zombie_query.iter_mut()
+                    {
                         if bullet_entity.eq(&e2) {
-                            commands.entity(e2).despawn();
-                            if zombie_entity.eq(&e1){
+                            commands.entity(e2).despawn_recursive();
+                            if zombie_entity.eq(&e1) {
                                 health.health_points -= 1;
-                                println!("Entity: {:?} took 1 dmg and now has: {:?}", commands.entity(zombie_entity).id(), health.health_points);
+                                println!(
+                                    "Entity: {:?} took 1 dmg and now has: {:?}",
+                                    commands.entity(zombie_entity).id(),
+                                    health.health_points
+                                );
 
-                                zombie_vel.linvel += (bullet_transform.translation + zombie_transform.translation)
+                                zombie_vel.linvel += (bullet_transform.translation
+                                    + zombie_transform.translation)
                                     .truncate()
                                     .normalize()
                                     * 500.0;
                             }
                         } else if bullet_entity.eq(&e1) {
-                            commands.entity(e1).despawn();
-                            if zombie_entity.eq(&e2){
+                            commands.entity(e1).despawn_recursive();
+                            if zombie_entity.eq(&e2) {
                                 health.health_points -= 1;
-                                println!("Entity: {:?} took 1 dmg and now has: {:?}", commands.entity(zombie_entity).id(), health.health_points);
+                                println!(
+                                    "Entity: {:?} took 1 dmg and now has: {:?}",
+                                    commands.entity(zombie_entity).id(),
+                                    health.health_points
+                                );
 
-                                zombie_vel.linvel += (bullet_transform.translation + zombie_transform.translation)
+                                zombie_vel.linvel += (bullet_transform.translation
+                                    + zombie_transform.translation)
                                     .truncate()
                                     .normalize()
                                     * 500.0;
@@ -271,139 +114,26 @@ pub fn bullet_collisions(
                         }
                     }
                 }
-                
-            }, 
-            CollisionEvent::Stopped(_e1, _e2, _) => {
-             
             }
-        }
-    }
-}
-
-pub fn player_movement(input: Res<Input<KeyCode>>, mut query: Query<&mut Velocity, With<Player>>, mut player_anim: Query<&mut Animations, With<Player>>) {
-    for mut velocity in &mut query {
-        let right = if input.pressed(KeyCode::D) { 1. } else { 0. };
-        let left = if input.pressed(KeyCode::A) { 1. } else { 0. };
-        let up = if input.pressed(KeyCode::W) { 1. } else { 0. };
-        let down = if input.pressed(KeyCode::S) { 1. } else { 0. };
-
-        velocity.linvel.x = (right - left) * 150.;
-        velocity.linvel.y = (up - down) * 150.;
-
-        if !velocity.eq(&Velocity::zero())  {
-            if let Ok(mut anim) = player_anim.get_single_mut() {
-                anim.current_animation = 0;
-            }
+            CollisionEvent::Stopped(_e1, _e2, _) => {}
         }
     }
 }
 
 pub fn spawn_buddy(
-    mut commands: Commands, 
+    mut commands: Commands,
     mouse_pos: Res<MouseLoc>,
     input: Res<Input<KeyCode>>,
     characters: Res<CharacterSheet>,
-){
-    if input.just_pressed(KeyCode::B) {
-        spawn_player_sprite(&mut commands, &characters, Vec3::new(mouse_pos.loc.x.clone(), mouse_pos.loc.y.clone(), 0.0));
-    }
-}
-
-pub fn talk(
-    input: Res<Input<KeyCode>>,
-    characters: Res<CharacterSheet>,
-    mut player_anim: Query<&mut Animations, With<Player>>
-){
-    if input.just_pressed(KeyCode::T) {
-        if let Ok(mut animation) = player_anim.get_single_mut() {
-            animation.current_animation = 1;
-            dbg!(animation);
-        }
-    }
-}
-
-
-pub fn spawn_player(
-    mut commands: Commands,
-    _ev_asset: EventReader<AssetEvent<Image>>,
-    _asset_server: Res<AssetServer>,
-    spawn_query: Query<&GridCoords, With<Spawn>>,
-    player_query: Query<Entity, With<Player>>,
-    _assets: Res<Assets<Image>>,
-    characters: Res<CharacterSheet>
 ) {
-    //for ev in ev_asset.iter() {
-        //match ev {
-            //AssetEvent::Created { handle } => {
-                //println!("Handle:{:?}", handle);
-
-                //let eeeeee: Handle<Image> = asset_server.load("player2.png");
-                //println!("Player sprite handle: {:?}", eeeeee);
-
-                if player_query.is_empty() {
-                    println!("Creating players");
-                    println!("{:?}", spawn_query);
-
-                    //let player = assets.get(handle).unwrap();
-                    //let player_height = player.texture_descriptor.size.height as f32 * 0.5;
-                    //let player_width = player.texture_descriptor.size.width as f32 * 0.5;
-
-                    //println!("Height: {}, Width: {}", player_height, player_width);
-
-                    spawn_query.for_each(|cords| {
-                        println!("1Spawning player at cords: x:{}, y:{}", cords.x, cords.y);
-                        commands.spawn(PlayerBundle {
-                            sprite_bundle: SpriteSheetBundle {
-                                transform: Transform::from_xyz(
-                                    (cords.x * 16 + 8) as f32,
-                                    (cords.y * 16 + 8) as f32,
-                                    0.0,
-                                ),
-                                sprite: TextureAtlasSprite::new(characters.run_animation[0]),
-                                texture_atlas: characters.handle.clone(),
-                                visibility: Visibility::Visible,
-                                ..default()
-                            },
-                            collider_bundle: ColliderBundle {
-                                collider: Collider::cuboid(5.0, 5.0),
-                                rigid_body: RigidBody::Dynamic,
-                                friction: Friction {
-                                    coefficient: 0.0,
-                                    combine_rule: CoefficientCombineRule::Min,
-                                },
-                                rotation_constraints: LockedAxes::ROTATION_LOCKED,
-                                ..Default::default()
-                            },
-                            weapon: Weapon{
-                                ..Default::default()},
-                            ..Default::default()
-                        })
-                        .insert(Animations {
-                                animations: vec![
-                                    FrameAnimation{
-                                        timer: Timer::from_seconds(0.2, TimerMode::Repeating),
-                                        frames: characters.run_animation.to_vec(),
-                                        current_frame: 0,
-                                    },
-                                    FrameAnimation{
-                                        timer: Timer::from_seconds(0.4, TimerMode::Repeating),
-                                        frames: characters.talk_animation.to_vec(),
-                                        current_frame: 0,
-                                    } ],
-                                current_animation: 0,
-                        });
-                    });
-                }
-            }
-            //AssetEvent::Modified { handle: _} => {
-                // an image was modified
-            //}
-            //AssetEvent::Removed { handle: _} => {
-                // an image was unloaded
-            //}
-//}
-   // }
-//}
+    if input.just_pressed(KeyCode::B) {
+        spawn_player_sprite(
+            &mut commands,
+            &characters,
+            Vec3::new(mouse_pos.loc.x.clone(), mouse_pos.loc.y.clone(), 0.0),
+        );
+    }
+}
 
 #[derive(Resource)]
 pub struct Edges {
@@ -412,22 +142,22 @@ pub struct Edges {
 
 #[derive(Resource)]
 pub struct Polygons {
-    pub visibility_points: Vec<(f32, f32, f32)>,     
+    pub visibility_points: Vec<(f32, f32, f32)>,
 }
 
- #[derive(Default,Debug)]
-    pub struct Edge{
-        pub sx: f32, 
-        pub sy: f32, 
-        pub ex: f32, 
-        pub ey: f32,
-    }
+#[derive(Default, Debug)]
+pub struct Edge {
+    pub sx: f32,
+    pub sy: f32,
+    pub ex: f32,
+    pub ey: f32,
+}
 
-    #[derive(Copy, Clone, Debug)]
-    pub struct Cell {
-        edge_id: [u32; 4], 
-        edge_exist: [bool; 4]
-    }
+#[derive(Copy, Clone, Debug)]
+pub struct Cell {
+    edge_id: [u32; 4],
+    edge_exist: [bool; 4],
+}
 
 #[derive(Resource)]
 pub struct Cells {
@@ -440,46 +170,45 @@ pub fn calculate_visibility_polygon(
     edges: Res<Edges>,
     mut commands: Commands,
     mouse_pos: Res<MouseLoc>,
-    _asset_server: Res<AssetServer>
-){
-    let mut visibility_points:Vec<(f32, f32, f32)> = vec![]; 
+    _asset_server: Res<AssetServer>,
+) {
+    let mut visibility_points: Vec<(f32, f32, f32)> = vec![];
     visibility_points.clear();
 
     let ox = mouse_pos.loc.x;
-    let oy = mouse_pos.loc.y; 
+    let oy = mouse_pos.loc.y;
 
     edges.edges.iter().for_each(|edge| {
         for i in 0..1 {
-            let rdx: f32 = if i == 0 {edge.sx} else {edge.ex} - ox;
-            let rdy: f32 = if i == 0 {edge.sy} else {edge.ey} - oy;
+            let rdx: f32 = if i == 0 { edge.sx } else { edge.ex } - ox;
+            let rdy: f32 = if i == 0 { edge.sy } else { edge.ey } - oy;
 
             let base_ang: f32 = Libm::<f32>::atan2(rdy, rdx);
             let mut ang: f32 = 0.0;
 
-
             for j in 0..2 {
                 match j {
-                   0 => { ang = base_ang - 0.0001}
-                   1 => { ang = base_ang }
-                   2 => { ang = base_ang + 0.0001}
-                   _ => {}
+                    0 => ang = base_ang - 0.0001,
+                    1 => ang = base_ang,
+                    2 => ang = base_ang + 0.0001,
+                    _ => {}
                 }
 
                 let sdx = 500.0 * Libm::<f32>::cos(ang);
                 let sdy = 500.0 * Libm::<f32>::sin(ang);
-                
 
                 let mut min_t1: f32 = 100000.0;
                 let mut min_px = 0.0;
                 let mut min_py = 0.0;
-                let mut min_ang = 0.0; 
+                let mut min_ang = 0.0;
                 let mut valid = false;
 
                 for edge2 in edges.edges.iter() {
-                    let t2 = (rdx * (edge2.sy - oy) + (rdy * (ox - edge2.sx))) / (sdx * rdy - sdy * rdx);
+                    let t2 =
+                        (rdx * (edge2.sy - oy) + (rdy * (ox - edge2.sx))) / (sdx * rdy - sdy * rdx);
                     let t1 = (edge2.sx + sdx * t2 - ox) / rdx;
 
-                    if t1 > 0.0 && t2 >= 0.0 && t2 <=1.0 {
+                    if t1 > 0.0 && t2 >= 0.0 && t2 <= 1.0 {
                         if t1 < min_t1 {
                             min_t1 = t1;
                             min_px = ox + rdx * t1;
@@ -497,37 +226,12 @@ pub fn calculate_visibility_polygon(
         }
     });
 
-    visibility_points.sort_by(|(a,_px, _py),(a1, _px1, _py1)|{
-        a.total_cmp(a1)
+    visibility_points.sort_by(|(a, _px, _py), (a1, _px1, _py1)| a.total_cmp(a1));
+
+    commands.insert_resource(Polygons {
+        visibility_points: visibility_points,
     });
-
-
-    // visibility_points.iter().for_each(|point| {commands.spawn(
-    //     SpriteBundle{
-    //         texture: asset_server.load("point_found.png"),
-    //         transform: Transform { 
-    //             translation: Vec3::from_array([point.1, point.2, 0.0]),
-    //             ..Default::default()
-    //         },
-    //         ..Default::default()
-    //     });
-    // });
-
-    commands.insert_resource(Polygons {visibility_points: visibility_points});
 }
-
-
-// pub fn draw_visibility_polygon(
-//     player_transform: Query<&Transform, With<Player>>,
-//     mut commands: Commands, 
-//     mut visibility_points: Res<Polygons>
-// ){
-//     let n_rays_cast: i32 = visibility_points.visibility_points.len() as i32;
-
-
-
-// }
-
 
 pub fn spawn_wall_collision(
     mut commands: Commands,
@@ -535,7 +239,7 @@ pub fn spawn_wall_collision(
     parent_query: Query<&Parent, Without<Wall>>,
     level_query: Query<(Entity, &Handle<LdtkLevel>)>,
     levels: Res<Assets<LdtkLevel>>,
-    asset_server: Res<AssetServer>
+    asset_server: Res<AssetServer>,
 ) {
     /// Represents a wide wall that is 1 tile tall
     /// Used to spawn wall collisions
@@ -553,27 +257,10 @@ pub fn spawn_wall_collision(
         bottom: i32,
     }
 
-    // #[derive(Default)]
-    // struct Edge{
-    //     sx: f32, 
-    //     sy: f32, 
-    //     ex: f32, 
-    //     ey: f32,
-    // }
-
-    // #[derive(Copy, Clone)]
-    // struct Cell {
-    //     edge_id: [u32; 4], 
-    //     edge_exist: [bool; 4],
-    //     exist: bool
-    // }
-
     let NORTH = 0;
     let SOUTH = 1;
     let EAST = 2;
     let WEST = 3;
-
-    //println!("{:?}",wall_query);
 
     // Consider where the walls are
     // storing them as GridCoords in a HashSet for quick, easy lookup
@@ -603,8 +290,6 @@ pub fn spawn_wall_collision(
                     .get(level_handle)
                     .expect("Level should be loaded by this point");
 
-
-
                 let LayerInstance {
                     c_wid: width,
                     c_hei: height,
@@ -619,25 +304,35 @@ pub fn spawn_wall_collision(
                 //edges for shadows
                 let mut vec_edges: Vec<Edge> = vec![];
                 vec_edges.clear();
-                let mut cells = vec![vec![Cell{edge_id: [0,0,0,0], edge_exist: [false, false, false, false]}; (width+1).try_into().unwrap()]; (height+1).try_into().unwrap()];
+                let mut cells = vec![
+                    vec![
+                        Cell {
+                            edge_id: [0, 0, 0, 0],
+                            edge_exist: [false, false, false, false]
+                        };
+                        (width + 1).try_into().unwrap()
+                    ];
+                    (height + 1).try_into().unwrap()
+                ];
                 println!("Width: {}, Height: {}", width, height);
                 for y in 0..height {
                     for x in 0..width + 1 {
-                        let i = &GridCoords{x: x, y: y};
-                        let n = &GridCoords{x: x, y: y - 1};
-                        let s = &GridCoords{x: x, y: y + 1};
-                        let e = &GridCoords{x: x + 1, y: y};
-                        let w = &GridCoords{x: x - 1, y: y};
-                         
+                        let i = &GridCoords { x: x, y: y };
+                        let n = &GridCoords { x: x, y: y - 1 };
+                        let s = &GridCoords { x: x, y: y + 1 };
+                        let e = &GridCoords { x: x + 1, y: y };
+                        let w = &GridCoords { x: x - 1, y: y };
+
                         match level_walls.contains(i) {
                             true => {
                                 let yi: usize = y.try_into().unwrap_or_default();
                                 let xi: usize = x.try_into().unwrap_or_default();
                                 if !level_walls.contains(w) {
                                     let ix: usize = (x).try_into().unwrap();
-                                    let iy: usize = (y-1).try_into().unwrap_or_default();
+                                    let iy: usize = (y - 1).try_into().unwrap_or_default();
                                     if cells[iy][ix].edge_exist[WEST] {
-                                        let edgei: usize = cells[iy][ix].edge_id[WEST].try_into().unwrap();
+                                        let edgei: usize =
+                                            cells[iy][ix].edge_id[WEST].try_into().unwrap();
                                         vec_edges[edgei].ey += 16.0;
                                         cells[yi][xi].edge_id[WEST] = cells[iy][ix].edge_id[WEST];
                                         cells[yi][xi].edge_exist[WEST] = true;
@@ -646,7 +341,7 @@ pub fn spawn_wall_collision(
                                             sx: (x as f32) * 16.0,
                                             sy: y as f32 * 16.0,
                                             ex: x as f32 * 16.0,
-                                            ey: (y as f32 ) * 16.0 + 16.0
+                                            ey: (y as f32) * 16.0 + 16.0,
                                         };
                                         let edge_id = vec_edges.len();
                                         vec_edges.push(edge);
@@ -654,12 +349,13 @@ pub fn spawn_wall_collision(
                                         cells[yi][xi].edge_id[WEST] = edge_id as u32;
                                         cells[yi][xi].edge_exist[WEST] = true;
                                     }
-                                } 
+                                }
                                 if !level_walls.contains(e) {
                                     let ix: usize = (x).try_into().unwrap();
-                                    let iy: usize = (y-1).try_into().unwrap_or_default();
+                                    let iy: usize = (y - 1).try_into().unwrap_or_default();
                                     if cells[iy][ix].edge_exist[EAST] {
-                                        let edgeid: usize = cells[iy][ix].edge_id[EAST].try_into().unwrap();
+                                        let edgeid: usize =
+                                            cells[iy][ix].edge_id[EAST].try_into().unwrap();
                                         vec_edges[edgeid].ey += 16.0;
                                         cells[yi][xi].edge_id[EAST] = cells[iy][ix].edge_id[EAST];
                                         cells[yi][xi].edge_exist[EAST] = true;
@@ -668,7 +364,7 @@ pub fn spawn_wall_collision(
                                             sx: (x as f32 + 1.0) * 16.0,
                                             sy: y as f32 * 16.0,
                                             ex: (x as f32 + 1.0) * 16.0,
-                                            ey: y as f32 * 16.0 + 16.0
+                                            ey: y as f32 * 16.0 + 16.0,
                                         };
                                         let edge_id = vec_edges.len();
                                         vec_edges.push(edge);
@@ -676,12 +372,13 @@ pub fn spawn_wall_collision(
                                         cells[yi][xi].edge_id[EAST] = edge_id as u32;
                                         cells[yi][xi].edge_exist[EAST] = true;
                                     }
-                                } 
+                                }
                                 if !level_walls.contains(n) {
-                                    let ix: usize = (x-1).try_into().unwrap_or_default();
+                                    let ix: usize = (x - 1).try_into().unwrap_or_default();
                                     let iy: usize = (y).try_into().unwrap();
                                     if cells[iy][ix].edge_exist[NORTH] {
-                                        let edgei: usize = cells[iy][ix].edge_id[NORTH].try_into().unwrap();
+                                        let edgei: usize =
+                                            cells[iy][ix].edge_id[NORTH].try_into().unwrap();
                                         vec_edges[edgei].ex += 16.0;
                                         cells[yi][xi].edge_id[NORTH] = cells[iy][ix].edge_id[NORTH];
                                         cells[yi][xi].edge_exist[NORTH] = true;
@@ -690,7 +387,7 @@ pub fn spawn_wall_collision(
                                             sx: (x as f32) * 16.0,
                                             sy: (y as f32) * 16.0,
                                             ex: x as f32 * 16.0 + 16.0,
-                                            ey: (y as f32) * 16.0
+                                            ey: (y as f32) * 16.0,
                                         };
                                         let edge_id = vec_edges.len();
                                         vec_edges.push(edge);
@@ -700,10 +397,11 @@ pub fn spawn_wall_collision(
                                     }
                                 }
                                 if !level_walls.contains(s) {
-                                    let ix: usize = (x-1).try_into().unwrap_or_default();
+                                    let ix: usize = (x - 1).try_into().unwrap_or_default();
                                     let iy: usize = (y).try_into().unwrap();
                                     if cells[iy][ix].edge_exist[SOUTH] {
-                                        let edgei: usize = cells[iy][ix].edge_id[SOUTH].try_into().unwrap();
+                                        let edgei: usize =
+                                            cells[iy][ix].edge_id[SOUTH].try_into().unwrap();
                                         vec_edges[edgei].ex += 16.0;
                                         cells[yi][xi].edge_id[SOUTH] = cells[iy][ix].edge_id[SOUTH];
                                         cells[yi][xi].edge_exist[SOUTH] = true;
@@ -712,7 +410,7 @@ pub fn spawn_wall_collision(
                                             sx: x as f32 * 16.0,
                                             sy: (y as f32 + 1.0) * 16.0,
                                             ex: x as f32 * 16.0 + 16.0,
-                                            ey: (y as f32 + 1.0) * 16.0
+                                            ey: (y as f32 + 1.0) * 16.0,
                                         };
                                         let edge_id = vec_edges.len();
                                         vec_edges.push(edge);
@@ -722,34 +420,32 @@ pub fn spawn_wall_collision(
                                     }
                                 }
                             }
-                            false => {
-                            }
+                            false => {}
                         }
                     }
                 }
                 vec_edges.iter().for_each(|edge| {
-                        commands.spawn(SpriteBundle{
-                            texture: asset_server.load("point_e.png"),
-                            transform: Transform { 
-                                translation: Vec3::from_array([edge.ex, edge.ey, 0.0]),
-                                ..Default::default()
-                            },
+                    commands.spawn(SpriteBundle {
+                        texture: asset_server.load("point_end.png"),
+                        transform: Transform {
+                            translation: Vec3::from_array([edge.ex, edge.ey, 0.0]),
                             ..Default::default()
-                        });
+                        },
+                        ..Default::default()
+                    });
 
-                        commands.spawn(SpriteBundle{
-                            texture: asset_server.load("point.png"),
-                            transform: Transform { 
-                                translation: Vec3::from_array([edge.sx, edge.sy, 1.0]),
-                                ..Default::default()
-                            },
+                    commands.spawn(SpriteBundle {
+                        texture: asset_server.load("point_start.png"),
+                        transform: Transform {
+                            translation: Vec3::from_array([edge.sx, edge.sy, 1.0]),
                             ..Default::default()
-                        });
+                        },
+                        ..Default::default()
+                    });
                 });
 
-                commands.insert_resource(Edges{edges: vec_edges});
+                commands.insert_resource(Edges { edges: vec_edges });
                 println!("Added edges ");
-
 
                 // combine wall tiles into flat "plates" in each individual row
                 let mut plate_stack: Vec<Vec<Plate>> = Vec::new();
@@ -884,16 +580,20 @@ pub fn camera_fit_inside_current_level(
                         bevy::render::camera::ScalingMode::Fixed { width, height };
 
                     if let Ok(player_position) = player_pos.get_single() {
-                        let camera_pos_offset = (mouse_pos.loc - player_position.translation.truncate()).normalize();
-                        let distance = mouse_pos.loc.distance(player_position.translation.truncate()) ;
+                        let camera_pos_offset =
+                            (mouse_pos.loc - player_position.translation.truncate()).normalize();
+                        let distance = mouse_pos
+                            .loc
+                            .distance(player_position.translation.truncate());
 
                         camera_transform.translation.x =
-                            (player_translation.x - level_transform.translation.x - width / 2. + camera_pos_offset.x * distance / 5.0)
+                            (player_translation.x - level_transform.translation.x - width / 2.
+                                + camera_pos_offset.x * distance / 5.0)
                                 .clamp(0., level.px_wid as f32 - width);
                         camera_transform.translation.y =
-                            (player_translation.y - level_transform.translation.y - height / 2. + camera_pos_offset.y * distance / 5.0)
+                            (player_translation.y - level_transform.translation.y - height / 2.
+                                + camera_pos_offset.y * distance / 5.0)
                                 .clamp(0., level.px_hei as f32 - height);
-
 
                         camera_transform.translation.x += level_transform.translation.x;
                         camera_transform.translation.y += level_transform.translation.y;

@@ -1,7 +1,9 @@
 use bevy::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
-
 use bevy_rapier2d::prelude::*;
+
+use crate::game::player::components::{Player, Spawn};
+use crate::game::enemies::components::{Zombie, Enemy};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
 pub struct Wall;
@@ -11,9 +13,6 @@ pub struct WallBundle {
     wall: Wall,
 }   
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
-pub struct Spawn;
-
 #[derive(Clone, Debug, Default, Bundle, LdtkIntCell)]
 pub struct SpawnBundle {
     spawn: Spawn,
@@ -21,9 +20,6 @@ pub struct SpawnBundle {
 
 #[derive(Component)]
 pub struct MainCamera;
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
-pub struct Player;
 
 #[derive(Clone, Default, Bundle)]
 pub struct PlayerBundle {
@@ -90,12 +86,6 @@ impl Default for ReloadTimer {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
-pub struct Enemy;
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
-pub struct Zombie;
-
 #[derive(Clone, Default, Bundle, LdtkEntity)]
 pub struct ZombieBundle {
     #[sprite_bundle("zombie.png")]
@@ -125,17 +115,6 @@ impl Default for Health{
         }
     }
 }
-
-// impl From<&EntityInstance> for Health {
-//     fn from(entity_instance: &EntityInstance) -> Self {
-//         Health(
-//             entity_instance
-//                 .get_int_field("health")
-//                 .expect("health field should be correctly typed")
-//                 .to_owned()
-//         )
-//     }
-// }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
 pub struct ShadowCaster;
