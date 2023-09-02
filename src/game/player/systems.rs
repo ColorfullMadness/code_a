@@ -7,8 +7,6 @@ use crate::game::player::components::*;
 use crate::components::{ColliderBundle, Health, PlayerBundle};
 
 use crate::components::{Weapon, Bullet, BulletBundle, Grenade, GrenadeBundle, DetonationTimer};
-use crate::game::ui::AmmoCountText;
-use crate::game::ui::HealthCountText;
 use crate::graphics::*;
 
 
@@ -270,27 +268,5 @@ pub fn spawn_player(
                     current_animation: 0,
                 });
         });
-    }
-}
-
-pub fn update_ammo_text(
-    weapon_query: Query<&Weapon, With<Player>>,
-    mut text_query: Query<&mut Text, With<AmmoCountText>>,
-) {
-    if let Ok(weapon) = weapon_query.get_single() {
-        if let Ok(mut text) = text_query.get_single_mut() {
-            text.sections[0].value = format!("Ammo: {}", weapon.ammo.bullets);
-        }
-    }
-}
-
-pub fn update_health_text(
-    health_query: Query<&Health, With<Player>>,
-    mut text_query: Query<&mut Text, With<HealthCountText>>,
-) {
-    if let Ok(health) = health_query.get_single() {
-        if let Ok(mut text) = text_query.get_single_mut() {
-            text.sections[0].value = format!("Health: {}", health.health_points);
-        }
     }
 }

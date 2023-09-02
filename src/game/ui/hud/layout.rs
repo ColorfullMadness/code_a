@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use crate::game::ui::{AmmoCountText, HealthCountText};
 
 use crate::game::ui::hud::*;
 
@@ -137,7 +136,5 @@ pub fn build_hud(
             }
         );
     }).id();
-
-
     hud_entity
 }
