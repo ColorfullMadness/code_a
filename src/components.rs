@@ -24,10 +24,8 @@ pub struct MainCamera;
 #[derive(Clone, Default, Bundle)]
 pub struct PlayerBundle {
     //#[sprite_bundle("player.png")]
-    #[bundle]
     pub sprite_bundle: SpriteSheetBundle,
     //#[from_entity_instance]
-    #[bundle]
     pub collider_bundle: ColliderBundle,
     pub player: Player,
     pub weapon: Weapon, 
@@ -89,10 +87,8 @@ impl Default for ReloadTimer {
 #[derive(Clone, Default, Bundle, LdtkEntity)]
 pub struct ZombieBundle {
     #[sprite_bundle("zombie.png")]
-    #[bundle]
     pub sprite_bundle: SpriteBundle,
     #[from_entity_instance]
-    #[bundle]
     pub collider_bundle: ColliderBundle,
     pub enemy: Enemy,
     pub zombie: Zombie,
@@ -127,7 +123,6 @@ pub struct Target {pub target: Vec2}
 
 #[derive(Clone, Default, Bundle)]
 pub struct BulletBundle {
-    #[bundle]
     pub sprite_bundle: SpriteBundle,
     pub collider_bundle: ColliderBundle,
 
@@ -139,7 +134,6 @@ pub struct Grenade;
 
 #[derive(Clone, Default, Bundle)]
 pub struct GrenadeBundle {
-    #[bundle]
     pub sprite_bundle: SpriteBundle,
     pub collider_bundle: ColliderBundle, 
 

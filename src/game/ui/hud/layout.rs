@@ -20,7 +20,8 @@ pub fn build_hud(
                 flex_direction: FlexDirection::Row,
                 justify_content: JustifyContent::Start,
                 align_items: AlignItems::Start,
-                size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
                 margin: UiRect::new(Val::Px(18.0), Val::Px(18.0), Val::Px(18.0), Val::Px(18.0)),
                 ..default()
             },
@@ -32,7 +33,8 @@ pub fn build_hud(
         parent.spawn(
             ImageBundle {
                 style: Style {
-                    size: Size::new(Val::Px(32.0),Val::Px(32.0)),
+                    width: Val::Px(32.0),
+                    height: Val::Px(32.0),
                     ..default()
                 },
                 image: asset_server.load("granade.png").into(),

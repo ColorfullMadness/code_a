@@ -22,12 +22,10 @@ use systems::*;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
-        .add_plugin(LdtkPlugin)
-        .add_plugin(WorldInspectorPlugin::default())
-        .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        .add_plugin(GraphicsPlugin)
+        .add_plugins(LdtkPlugin)
+        .add_plugins(WorldInspectorPlugin::default())
+        .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         // Required to prevent race conditions between bevy_ecs_ldtk's and bevy_rapier's systems
-        .configure_set(LdtkSystemSet::ProcessApi.before(PhysicsSet::SyncBackend))
         .insert_resource(RapierConfiguration {
             gravity: Vec2::new(0.0, 0.0),
             ..Default::default()
@@ -47,6 +45,7 @@ fn main() {
         .add_plugin(GameUIPlugin)
         .add_plugin(EnemyPlugin)
         .add_plugin(PlayerPlugin)
+        .add_plugin(GraphicsPlugin)
         .add_startup_system(setup)
         .add_system(bullet_collisions)
         .add_system(spawn_buddy)
