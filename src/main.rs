@@ -35,7 +35,7 @@ fn main() {
         .insert_resource(LevelSelection::Uid(0))
         .insert_resource(LdtkSettings {
             level_spawn_behavior: LevelSpawnBehavior::UseWorldTranslation { 
-                load_level_neighbors: false 
+                load_level_neighbors: true 
             },
             set_clear_color: SetClearColor::FromLevelBackground,
             ..Default::default()
@@ -48,6 +48,7 @@ fn main() {
         .add_plugin(EnemyPlugin)
         .add_plugin(PlayerPlugin)
         .add_startup_system(setup)
+        .add_system(update_level_selection)
         .add_system(bullet_collisions)
         .add_system(spawn_buddy)
         .add_system(mouse_movement_updating_system)
