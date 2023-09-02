@@ -6,7 +6,7 @@ use crate::AppState;
 use systems::*;
 
 pub mod components;
-mod systems;
+pub(crate) mod systems;
 
 pub struct PlayerPlugin;
 
