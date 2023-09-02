@@ -41,6 +41,7 @@ pub struct PlayerBundle {
     // The whole EntityInstance can be stored directly as an EntityInstance component
     //#[from_entity_instance]
     pub entity_instance: EntityInstance,
+    pub health: Health
 }
 
 #[derive(Clone, Default, Component)]

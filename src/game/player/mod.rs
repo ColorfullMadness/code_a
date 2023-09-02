@@ -21,6 +21,7 @@ impl Plugin for PlayerPlugin {
                 player_shoot, 
                 player_throw_grenade,
                 rotate_player,
+                talk,
             ).in_set(OnUpdate(AppState::Game))
         );
     }

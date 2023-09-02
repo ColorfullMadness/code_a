@@ -250,6 +250,9 @@ pub fn spawn_player(
                     weapon: Weapon {
                         ..Default::default()
                     },
+                    health: Health{
+                        health_points: 10
+                    },
                     ..Default::default()
                 })
                 .insert(Animations {
