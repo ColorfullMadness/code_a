@@ -33,17 +33,18 @@ pub fn player_reload(
     time: Res<Time>
 ){   
     if let Ok(mut weapon) = weapon_query.get_single_mut(){
-        if (input.just_pressed(KeyCode::R) || input.pressed(KeyCode::R)) && weapon.ammo.bullets == 0{
+        if input.just_pressed(KeyCode::R) {
             println!("RELOADING");
-            weapon.reload_timer.reload_timer.tick(time.delta());
-            if weapon.reload_timer.reload_timer.finished() {
-                weapon.ammo.bullets = 300000;
-                weapon.reload_timer.reload_timer.reset();
-                println!("RELOADED + 30");
-            }
+            weapon.reloading = true;
         }
-        if input.just_released(KeyCode::R) {
+        if weapon.reloading {
+            weapon.reload_timer.reload_timer.tick(time.delta());
+        }
+        if weapon.reload_timer.reload_timer.finished() {
+            weapon.ammo.bullets = weapon.mag_size;
             weapon.reload_timer.reload_timer.reset();
+            weapon.reloading = false;
+            println!("RELOADED + 30");
         }
     }
 }
@@ -177,6 +178,7 @@ pub fn player_throw_grenade(
 pub fn player_movement(
     input: Res<Input<KeyCode>>,
     mut query: Query<&mut Velocity, With<Player>>,
+    player_weapon: Query<&Weapon, With<Player>>,
     mut player_anim: Query<&mut Animations, With<Player>>,
 ) {
     for mut velocity in &mut query {
@@ -187,6 +189,13 @@ pub fn player_movement(
 
         velocity.linvel.x = (right - left) * 150.;
         velocity.linvel.y = (up - down) * 150.;
+
+        if let Ok(weapon) = player_weapon.get_single() {
+            if weapon.reloading {
+                velocity.linvel.x /= 2.0;
+                velocity.linvel.y /= 2.0;
+            }
+        }
 
         if !velocity.eq(&Velocity::zero()) {
             if let Ok(mut anim) = player_anim.get_single_mut() {
@@ -248,6 +257,8 @@ pub fn spawn_player(
                         ..Default::default()
                     },
                     weapon: Weapon {
+                        reloading: false,
+                        mag_size: 30,
                         ..Default::default()
                     },
                     health: Health{

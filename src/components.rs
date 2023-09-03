@@ -48,7 +48,9 @@ pub struct PlayerBundle {
 pub struct Weapon {
     pub fire_rate: FireRate,
     pub ammo: Ammo,
+    pub mag_size: u32,
     pub reload_timer: ReloadTimer,
+    pub reloading: bool
 }
 
 #[derive(Clone, Component, Debug)]

@@ -582,12 +582,12 @@ pub fn camera_fit_inside_current_level(
 
                         camera_transform.translation.x =
                             (player_translation.x - level_transform.translation.x - width / 2.
-                                + camera_pos_offset.x * distance / 5.0)
-                                .clamp(0., level.px_wid as f32 - width);
+                                + camera_pos_offset.x * distance / 5.0);
+                                //.clamp(0., level.px_wid as f32 - width);
                         camera_transform.translation.y =
                             (player_translation.y - level_transform.translation.y - height / 2.
-                                + camera_pos_offset.y * distance / 5.0)
-                                .clamp(0., level.px_hei as f32 - height);
+                                + camera_pos_offset.y * distance / 5.0);
+                                //.clamp(0., level.px_hei as f32 - height);
 
                         camera_transform.translation.x += level_transform.translation.x;
                         camera_transform.translation.y += level_transform.translation.y;
