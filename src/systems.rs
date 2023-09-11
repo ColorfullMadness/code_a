@@ -109,11 +109,20 @@ pub fn blow_up_granade(
     mut grenades: Query<(&mut DetonationTimer, &Transform, Entity), With<Grenade>>,
     mut commands: Commands,
     mut zombies: Query<(&Transform, &mut Health), With<Zombie>>,
+    asset_server: Res<AssetServer>,
 ) {
     for (mut det_timer, grenade_transform, entity) in grenades.iter_mut() {
         det_timer.detonation_timer.tick(time.delta());
         if det_timer.detonation_timer.finished() {
             commands.entity(entity).despawn();
+            let explosion = commands.spawn(SpriteBundle{
+                texture: asset_server.load("grenade_explosion.png"),
+                ..Default::default()
+            }).id();
+            
+
+            commands.entity(explosion).despawn();
+
             for (zombie_trans, mut zombie_health) in zombies.iter_mut() {
                 if zombie_trans
                     .translation
@@ -139,42 +148,27 @@ pub fn bullet_collisions(
         match b {
             CollisionEvent::Started(e1, e2, _) => {
                 for (bullet_transform, bullet_entity) in bullet_query.iter() {
-                    for (mut health, zombie_entity, mut zombie_vel, zombie_transform) in
-                        zombie_query.iter_mut()
+                    for (mut health, zombie_entity, mut zombie_vel, zombie_transform) in zombie_query.iter_mut()
                     {
-                        if bullet_entity.eq(&e2) {
-                            commands.entity(e2).despawn_recursive();
-                            if zombie_entity.eq(&e1) {
-                                health.health_points -= 1;
-                                println!(
-                                    "Entity: {:?} took 1 dmg and now has: {:?}",
-                                    commands.entity(zombie_entity).id(),
-                                    health.health_points
-                                );
+                        if zombie_entity.eq(&e1) || zombie_entity.eq(&e2) {
+                            health.health_points -= 1;
+                            println!(
+                                "Entity: {:?} took 1 dmg and now has: {:?}",
+                                commands.entity(zombie_entity).id(),
+                                health.health_points
+                            );
 
-                                zombie_vel.linvel += (bullet_transform.translation
-                                    + zombie_transform.translation)
-                                    .truncate()
-                                    .normalize()
-                                    * 500.0;
-                            }
-                        } else if bullet_entity.eq(&e1) {
-                            commands.entity(e1).despawn_recursive();
-                            if zombie_entity.eq(&e2) {
-                                health.health_points -= 1;
-                                println!(
-                                    "Entity: {:?} took 1 dmg and now has: {:?}",
-                                    commands.entity(zombie_entity).id(),
-                                    health.health_points
-                                );
-
-                                zombie_vel.linvel += (bullet_transform.translation
-                                    + zombie_transform.translation)
-                                    .truncate()
-                                    .normalize()
-                                    * 500.0;
-                            }
-                        }
+                            zombie_vel.linvel += (bullet_transform.translation
+                                + zombie_transform.translation)
+                                .truncate()
+                                .normalize()
+                                * 500.0;
+                        } 
+                    }
+                    if bullet_entity.eq(&e2) {
+                        commands.entity(e2).despawn_recursive();
+                    } else if bullet_entity.eq(&e1) {
+                        commands.entity(e1).despawn_recursive();
                     }
                 }
             }
@@ -582,12 +576,12 @@ pub fn camera_fit_inside_current_level(
 
                         camera_transform.translation.x =
                             (player_translation.x - level_transform.translation.x - width / 2.
-                                + camera_pos_offset.x * distance / 5.0);
-                                //.clamp(0., level.px_wid as f32 - width);
+                                + camera_pos_offset.x * distance / 5.0)
+                                .clamp(0., level.px_wid as f32 - width);
                         camera_transform.translation.y =
                             (player_translation.y - level_transform.translation.y - height / 2.
-                                + camera_pos_offset.y * distance / 5.0);
-                                //.clamp(0., level.px_hei as f32 - height);
+                                + camera_pos_offset.y * distance / 5.0)
+                                .clamp(0., level.px_hei as f32 - height);
 
                         camera_transform.translation.x += level_transform.translation.x;
                         camera_transform.translation.y += level_transform.translation.y;
