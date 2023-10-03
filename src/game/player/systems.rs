@@ -1,13 +1,17 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use bevy_ecs_ldtk::prelude::*;
+use std::thread;
+use std::time::Duration;
 
 use crate::MouseLoc;
 use crate::game::player::components::*;
-use crate::components::{ColliderBundle, Health, PlayerBundle};
+use crate::components::{ColliderBundle, Health, PlayerBundle, Ammo};
 
 use crate::components::{Weapon, Bullet, BulletBundle, Grenade, GrenadeBundle, DetonationTimer};
+use crate::game::enemies::components::Zombie;
 use crate::graphics::*;
+use crate::AppState;
 
 //TODO add another system that drives player animations
 
@@ -24,6 +28,57 @@ pub fn rotate_player(
             } else if mouse_pos.loc.x > transform.translation.x && sprite.flip_x {
                 sprite.flip_x = false;
             }
+        }
+    }
+}
+
+pub fn player_take_dmg(
+    mut zombies: Query<(&Transform, Entity), With<Zombie>>,
+    mut player: Query<(&mut Health, Entity, &Transform, &mut Velocity), With<Player>>,
+    mut player_collisions: EventReader<CollisionEvent>,
+    mut commands: Commands,
+) {
+    for col_event in player_collisions.iter() {
+        println!("Received collision event: {:?}", col_event.to_owned());
+        match col_event.to_owned() {
+            CollisionEvent::Started(e1, e2, _) => {
+                for (zombie_transform, zombie_entity) in zombies.iter() {
+                    for (mut health, player_entity, mut player_transform, mut velocity) in player.iter_mut() {
+                        if player_entity.eq(&e1) || player_entity.eq(&e2) {
+                            if zombie_entity.eq(&e1) || zombie_entity.eq(&e2) {
+                                health.health_points -= 1;
+                                println!(
+                                    "Player: {:?} took 1 dmg and now has: {:?}",
+                                    commands.entity(player_entity).id(),
+                                    health.health_points
+                                );
+
+                                velocity.linvel += (zombie_transform.translation
+                                    + player_transform.translation)
+                                    .truncate()
+                                    .normalize()
+                                    * 500.0;
+                            }
+                        }
+                    }
+                }
+            }
+            CollisionEvent::Stopped(_e1, _e2, _) => {}
+        }
+    }
+}
+
+pub fn kill_player(
+    player_health: Query<(Entity, &Health), With<Player>>,
+    mut app_state_next_state: ResMut<NextState<AppState>>,
+    mut commands: Commands
+) {
+    if let Ok((player, health)) = player_health.get_single() {
+        if health.health_points == 0{
+            app_state_next_state.set(AppState::GameOver);
+            commands.entity(player).despawn();
+            //std::thread::sleep(Duration::new(2,0) );
+            //app_state_next_state.set(AppState::MainMenu);
         }
     }
 }
@@ -248,12 +303,17 @@ pub fn spawn_player(
 
         spawn_query.for_each(|cords| {
             println!("1Spawning player at cords: x:{}, y:{}", cords.x, cords.y);
+            let mut x: f32 = cords.x as f32 * 16.0;
+            let mut y: f32 = cords.y as f32 * 16.0;
+            x += 8.0;
+            y += 8.0;
+            y *= 2f32;
             commands
                 .spawn(PlayerBundle {
                     sprite_bundle: SpriteSheetBundle {
                         transform: Transform::from_xyz(
-                            (cords.x * 16 + 8) as f32,
-                            (cords.y * 16 + 8) as f32,
+                            x,
+                            y,
                             0.0,
                         ),
                         sprite: TextureAtlasSprite::new(characters.run_animation[0]),
@@ -274,6 +334,9 @@ pub fn spawn_player(
                     weapon: Weapon {
                         reloading: false,
                         mag_size: 30,
+                        ammo: Ammo{
+                            bullets: 0,
+                        },
                         ..Default::default()
                     },
                     health: Health{
@@ -305,7 +368,8 @@ pub fn spawn_player(
                         }
                     ],
                     current_animation: 0,
-                });
+                })
+                .insert(ActiveEvents::COLLISION_EVENTS);
         });
     }
 }

@@ -1,6 +1,4 @@
 use bevy::{prelude::*, reflect::Enum};
-use bevy_inspector_egui::egui::Frame;
-
 
 pub struct GraphicsPlugin;
 

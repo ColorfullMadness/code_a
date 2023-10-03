@@ -25,7 +25,7 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     };
     commands.spawn((camera, MainCamera));
 
-    let ldtk_handle = asset_server.load("marmolada.ldtk");
+    let ldtk_handle = asset_server.load("test.ldtk");
     commands.spawn(LdtkWorldBundle {
         ldtk_handle,
         ..Default::default()
@@ -296,151 +296,151 @@ pub fn spawn_wall_collision(
                     .clone()
                     .expect("Level asset should have layers")[0];
 
-                //Edges for shadows
-                let mut vec_edges: Vec<Edge> = vec![];
-                vec_edges.clear();
-                let mut cells = vec![
-                    vec![
-                        Cell {
-                            edge_id: [0, 0, 0, 0],
-                            edge_exist: [false, false, false, false]
-                        };
-                        (width + 1).try_into().unwrap()
-                    ];
-                    (height + 1).try_into().unwrap()
-                ];
-                println!("Width: {}, Height: {}", width, height);
-                for y in 0..height {
-                    for x in 0..width + 1 {
-                        let i = &GridCoords { x: x, y: y };
-                        let n = &GridCoords { x: x, y: y - 1 };
-                        let s = &GridCoords { x: x, y: y + 1 };
-                        let e = &GridCoords { x: x + 1, y: y };
-                        let w = &GridCoords { x: x - 1, y: y };
-
-                        match level_walls.contains(i) {
-                            true => {
-                                let yi: usize = y.try_into().unwrap_or_default();
-                                let xi: usize = x.try_into().unwrap_or_default();
-                                if !level_walls.contains(w) {
-                                    let ix: usize = (x).try_into().unwrap();
-                                    let iy: usize = (y - 1).try_into().unwrap_or_default();
-                                    if cells[iy][ix].edge_exist[WEST] {
-                                        let edgei: usize =
-                                            cells[iy][ix].edge_id[WEST].try_into().unwrap();
-                                        vec_edges[edgei].ey += 16.0;
-                                        cells[yi][xi].edge_id[WEST] = cells[iy][ix].edge_id[WEST];
-                                        cells[yi][xi].edge_exist[WEST] = true;
-                                    } else {
-                                        let edge = Edge {
-                                            sx: (x as f32) * 16.0,
-                                            sy: y as f32 * 16.0,
-                                            ex: x as f32 * 16.0,
-                                            ey: (y as f32) * 16.0 + 16.0,
-                                        };
-                                        let edge_id = vec_edges.len();
-                                        vec_edges.push(edge);
-
-                                        cells[yi][xi].edge_id[WEST] = edge_id as u32;
-                                        cells[yi][xi].edge_exist[WEST] = true;
-                                    }
-                                }
-                                if !level_walls.contains(e) {
-                                    let ix: usize = (x).try_into().unwrap();
-                                    let iy: usize = (y - 1).try_into().unwrap_or_default();
-                                    if cells[iy][ix].edge_exist[EAST] {
-                                        let edgeid: usize =
-                                            cells[iy][ix].edge_id[EAST].try_into().unwrap();
-                                        vec_edges[edgeid].ey += 16.0;
-                                        cells[yi][xi].edge_id[EAST] = cells[iy][ix].edge_id[EAST];
-                                        cells[yi][xi].edge_exist[EAST] = true;
-                                    } else {
-                                        let edge = Edge {
-                                            sx: (x as f32 + 1.0) * 16.0,
-                                            sy: y as f32 * 16.0,
-                                            ex: (x as f32 + 1.0) * 16.0,
-                                            ey: y as f32 * 16.0 + 16.0,
-                                        };
-                                        let edge_id = vec_edges.len();
-                                        vec_edges.push(edge);
-
-                                        cells[yi][xi].edge_id[EAST] = edge_id as u32;
-                                        cells[yi][xi].edge_exist[EAST] = true;
-                                    }
-                                }
-                                if !level_walls.contains(n) {
-                                    let ix: usize = (x - 1).try_into().unwrap_or_default();
-                                    let iy: usize = (y).try_into().unwrap();
-                                    if cells[iy][ix].edge_exist[NORTH] {
-                                        let edgei: usize =
-                                            cells[iy][ix].edge_id[NORTH].try_into().unwrap();
-                                        vec_edges[edgei].ex += 16.0;
-                                        cells[yi][xi].edge_id[NORTH] = cells[iy][ix].edge_id[NORTH];
-                                        cells[yi][xi].edge_exist[NORTH] = true;
-                                    } else {
-                                        let edge = Edge {
-                                            sx: (x as f32) * 16.0,
-                                            sy: (y as f32) * 16.0,
-                                            ex: x as f32 * 16.0 + 16.0,
-                                            ey: (y as f32) * 16.0,
-                                        };
-                                        let edge_id = vec_edges.len();
-                                        vec_edges.push(edge);
-
-                                        cells[yi][xi].edge_id[NORTH] = edge_id as u32;
-                                        cells[yi][xi].edge_exist[NORTH] = true;
-                                    }
-                                }
-                                if !level_walls.contains(s) {
-                                    let ix: usize = (x - 1).try_into().unwrap_or_default();
-                                    let iy: usize = (y).try_into().unwrap();
-                                    if cells[iy][ix].edge_exist[SOUTH] {
-                                        let edgei: usize =
-                                            cells[iy][ix].edge_id[SOUTH].try_into().unwrap();
-                                        vec_edges[edgei].ex += 16.0;
-                                        cells[yi][xi].edge_id[SOUTH] = cells[iy][ix].edge_id[SOUTH];
-                                        cells[yi][xi].edge_exist[SOUTH] = true;
-                                    } else {
-                                        let edge = Edge {
-                                            sx: x as f32 * 16.0,
-                                            sy: (y as f32 + 1.0) * 16.0,
-                                            ex: x as f32 * 16.0 + 16.0,
-                                            ey: (y as f32 + 1.0) * 16.0,
-                                        };
-                                        let edge_id = vec_edges.len();
-                                        vec_edges.push(edge);
-
-                                        cells[yi][xi].edge_id[SOUTH] = edge_id as u32;
-                                        cells[yi][xi].edge_exist[SOUTH] = true;
-                                    }
-                                }
-                            }
-                            false => {}
-                        }
-                    }
-                }
-                vec_edges.iter().for_each(|edge| {
-                    commands.spawn(SpriteBundle {
-                        texture: asset_server.load("point_end.png"),
-                        transform: Transform {
-                            translation: Vec3::from_array([edge.ex, edge.ey, 0.0]),
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    });
-
-                    commands.spawn(SpriteBundle {
-                        texture: asset_server.load("point_start.png"),
-                        transform: Transform {
-                            translation: Vec3::from_array([edge.sx, edge.sy, 1.0]),
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    });
-                });
-
-                commands.insert_resource(Edges { edges: vec_edges });
-                println!("Added edges ");
+                // //Edges for shadows
+                // let mut vec_edges: Vec<Edge> = vec![];
+                // vec_edges.clear();
+                // let mut cells = vec![
+                //     vec![
+                //         Cell {
+                //             edge_id: [0, 0, 0, 0],
+                //             edge_exist: [false, false, false, false]
+                //         };
+                //         (width + 1).try_into().unwrap()
+                //     ];
+                //     (height + 1).try_into().unwrap()
+                // ];
+                // println!("Width: {}, Height: {}", width, height);
+                // for y in 0..height {
+                //     for x in 0..width + 1 {
+                //         let i = &GridCoords { x: x, y: y };
+                //         let n = &GridCoords { x: x, y: y - 1 };
+                //         let s = &GridCoords { x: x, y: y + 1 };
+                //         let e = &GridCoords { x: x + 1, y: y };
+                //         let w = &GridCoords { x: x - 1, y: y };
+                //
+                //         match level_walls.contains(i) {
+                //             true => {
+                //                 let yi: usize = y.try_into().unwrap_or_default();
+                //                 let xi: usize = x.try_into().unwrap_or_default();
+                //                 if !level_walls.contains(w) {
+                //                     let ix: usize = (x).try_into().unwrap();
+                //                     let iy: usize = (y - 1).try_into().unwrap_or_default();
+                //                     if cells[iy][ix].edge_exist[WEST] {
+                //                         let edgei: usize =
+                //                             cells[iy][ix].edge_id[WEST].try_into().unwrap();
+                //                         vec_edges[edgei].ey += 16.0;
+                //                         cells[yi][xi].edge_id[WEST] = cells[iy][ix].edge_id[WEST];
+                //                         cells[yi][xi].edge_exist[WEST] = true;
+                //                     } else {
+                //                         let edge = Edge {
+                //                             sx: (x as f32) * 16.0,
+                //                             sy: y as f32 * 16.0,
+                //                             ex: x as f32 * 16.0,
+                //                             ey: (y as f32) * 16.0 + 16.0,
+                //                         };
+                //                         let edge_id = vec_edges.len();
+                //                         vec_edges.push(edge);
+                //
+                //                         cells[yi][xi].edge_id[WEST] = edge_id as u32;
+                //                         cells[yi][xi].edge_exist[WEST] = true;
+                //                     }
+                //                 }
+                //                 if !level_walls.contains(e) {
+                //                     let ix: usize = (x).try_into().unwrap();
+                //                     let iy: usize = (y - 1).try_into().unwrap_or_default();
+                //                     if cells[iy][ix].edge_exist[EAST] {
+                //                         let edgeid: usize =
+                //                             cells[iy][ix].edge_id[EAST].try_into().unwrap();
+                //                         vec_edges[edgeid].ey += 16.0;
+                //                         cells[yi][xi].edge_id[EAST] = cells[iy][ix].edge_id[EAST];
+                //                         cells[yi][xi].edge_exist[EAST] = true;
+                //                     } else {
+                //                         let edge = Edge {
+                //                             sx: (x as f32 + 1.0) * 16.0,
+                //                             sy: y as f32 * 16.0,
+                //                             ex: (x as f32 + 1.0) * 16.0,
+                //                             ey: y as f32 * 16.0 + 16.0,
+                //                         };
+                //                         let edge_id = vec_edges.len();
+                //                         vec_edges.push(edge);
+                //
+                //                         cells[yi][xi].edge_id[EAST] = edge_id as u32;
+                //                         cells[yi][xi].edge_exist[EAST] = true;
+                //                     }
+                //                 }
+                //                 if !level_walls.contains(n) {
+                //                     let ix: usize = (x - 1).try_into().unwrap_or_default();
+                //                     let iy: usize = (y).try_into().unwrap();
+                //                     if cells[iy][ix].edge_exist[NORTH] {
+                //                         let edgei: usize =
+                //                             cells[iy][ix].edge_id[NORTH].try_into().unwrap();
+                //                         vec_edges[edgei].ex += 16.0;
+                //                         cells[yi][xi].edge_id[NORTH] = cells[iy][ix].edge_id[NORTH];
+                //                         cells[yi][xi].edge_exist[NORTH] = true;
+                //                     } else {
+                //                         let edge = Edge {
+                //                             sx: (x as f32) * 16.0,
+                //                             sy: (y as f32) * 16.0,
+                //                             ex: x as f32 * 16.0 + 16.0,
+                //                             ey: (y as f32) * 16.0,
+                //                         };
+                //                         let edge_id = vec_edges.len();
+                //                         vec_edges.push(edge);
+                //
+                //                         cells[yi][xi].edge_id[NORTH] = edge_id as u32;
+                //                         cells[yi][xi].edge_exist[NORTH] = true;
+                //                     }
+                //                 }
+                //                 if !level_walls.contains(s) {
+                //                     let ix: usize = (x - 1).try_into().unwrap_or_default();
+                //                     let iy: usize = (y).try_into().unwrap();
+                //                     if cells[iy][ix].edge_exist[SOUTH] {
+                //                         let edgei: usize =
+                //                             cells[iy][ix].edge_id[SOUTH].try_into().unwrap();
+                //                         vec_edges[edgei].ex += 16.0;
+                //                         cells[yi][xi].edge_id[SOUTH] = cells[iy][ix].edge_id[SOUTH];
+                //                         cells[yi][xi].edge_exist[SOUTH] = true;
+                //                     } else {
+                //                         let edge = Edge {
+                //                             sx: x as f32 * 16.0,
+                //                             sy: (y as f32 + 1.0) * 16.0,
+                //                             ex: x as f32 * 16.0 + 16.0,
+                //                             ey: (y as f32 + 1.0) * 16.0,
+                //                         };
+                //                         let edge_id = vec_edges.len();
+                //                         vec_edges.push(edge);
+                //
+                //                         cells[yi][xi].edge_id[SOUTH] = edge_id as u32;
+                //                         cells[yi][xi].edge_exist[SOUTH] = true;
+                //                     }
+                //                 }
+                //             }
+                //             false => {}
+                //         }
+                //     }
+                // }
+                // vec_edges.iter().for_each(|edge| {
+                //     commands.spawn(SpriteBundle {
+                //         texture: asset_server.load("point_end.png"),
+                //         transform: Transform {
+                //             translation: Vec3::from_array([edge.ex, edge.ey, 0.0]),
+                //             ..Default::default()
+                //         },
+                //         ..Default::default()
+                //     });
+                //
+                //     commands.spawn(SpriteBundle {
+                //         texture: asset_server.load("point_start.png"),
+                //         transform: Transform {
+                //             translation: Vec3::from_array([edge.sx, edge.sy, 1.0]),
+                //             ..Default::default()
+                //         },
+                //         ..Default::default()
+                //     });
+                // });
+                //
+                // commands.insert_resource(Edges { edges: vec_edges });
+                // println!("Added edges ");
 
                 // combine wall tiles into flat "plates" in each individual row
                 let mut plate_stack: Vec<Vec<Plate>> = Vec::new();

@@ -27,42 +27,6 @@ pub fn build_hud(
         },
         Hud{},
     )).with_children(|parent|{
-        //image
-        parent.spawn(
-            ImageBundle {
-                style: Style {
-                    size: Size::new(Val::Px(32.0),Val::Px(32.0)),
-                    ..default()
-                },
-                image: asset_server.load("granade.png").into(),
-                ..default()
-            }
-        );
-        parent.spawn((
-            TextBundle{
-                text: Text {
-                    sections: vec![
-                        TextSection::new(
-                            "Play!",
-                            TextStyle {
-                                font: asset_server.load("fonts/FiraSans-Bold.ttf").into(),
-                                font_size: 32.0,
-                                color: Color::WHITE,
-                            }
-                            )
-                    ],
-                    alignment: TextAlignment::Center,   
-                    ..default()
-                },
-                style: Style {
-                    flex_direction: FlexDirection::Row,
-                    ..default()
-                },
-                background_color: BackgroundColor(Color::BLACK),
-                ..default()
-            },
-            //ScoreText{},
-        ));
         parent.spawn(
             TextBundle {
                 style: Style {
@@ -133,8 +97,9 @@ pub fn build_hud(
                 },
                 image: asset_server.load("oscilloscope.png").into(),
                 ..default()
-            }
+            },
         );
+
     }).id();
     hud_entity
 }

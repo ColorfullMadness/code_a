@@ -114,6 +114,29 @@ pub fn build_main_menu(
                 }
             );
         });
+        parent.spawn(
+            TextBundle {
+                style: Style {
+                    align_items: AlignItems::Center,
+                    ..Default::default()
+                },
+                text: Text {
+                    sections: vec![
+                        TextSection::new(
+                            "Find Oscilloscope to win.",
+                            TextStyle {
+                                font: asset_server.load("fonts/FiraSans-Bold.ttf").into(),
+                                font_size: 32.0,
+                                color: Color::WHITE,
+                            }
+                        )
+                    ],
+                    alignment: TextAlignment::Left,
+                    ..default()
+                },
+                ..default()
+            }
+        );
     })
     .id();
 

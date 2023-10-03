@@ -18,6 +18,12 @@ impl Plugin for EnemyPlugin {
             )
             .in_set(OnUpdate(AppState::Game))
             //.in_set(OnUpdate(SimulationState::Running))
+        )
+        .add_systems(
+            (
+                despawn_zombies,
+                )
+                .in_schedule(OnEnter(AppState::GameOver))
         );
     }
 }

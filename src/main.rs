@@ -1,7 +1,6 @@
 use bevy::{prelude::*};
 use bevy_ecs_ldtk::prelude::*;
 use bevy_rapier2d::prelude::*;
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 mod resources;
 mod components;
@@ -23,7 +22,6 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugin(LdtkPlugin)
-        .add_plugin(WorldInspectorPlugin::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(GraphicsPlugin)
         // Required to prevent race conditions between bevy_ecs_ldtk's and bevy_rapier's systems
