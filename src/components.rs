@@ -4,6 +4,7 @@ use bevy_rapier2d::prelude::*;
 
 use crate::game::player::components::{Player, Spawn};
 use crate::game::enemies::components::{Zombie, Enemy};
+use crate::graphics::FrameAnimation;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
 pub struct Wall;
@@ -104,6 +105,7 @@ pub struct ZombieBundle {
     #[from_entity_instance]
     pub entity_instance: EntityInstance,
     pub health: Health,
+    pub animations: FrameAnimation,
 }
 
 #[derive(Clone, Component, Debug, Eq, PartialEq)]
@@ -185,15 +187,6 @@ impl From<&EntityInstance> for ColliderBundle {
                 collider: Collider::ball(12.0),
                 rigid_body: RigidBody::Dynamic,
                 rotation_constraints,
-                ..Default::default()
-            },
-            "Chest" => ColliderBundle {
-                collider: Collider::cuboid(8., 8.),
-                rigid_body: RigidBody::Dynamic,
-                rotation_constraints,
-                gravity_scale: GravityScale(1.0),
-                friction: Friction::new(0.5),
-                density: ColliderMassProperties::Density(15.0),
                 ..Default::default()
             },
             _ => ColliderBundle::default(),

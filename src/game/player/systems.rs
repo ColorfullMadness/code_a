@@ -9,6 +9,7 @@ use crate::components::{ColliderBundle, Health, PlayerBundle};
 use crate::components::{Weapon, Bullet, BulletBundle, Grenade, GrenadeBundle, DetonationTimer};
 use crate::graphics::*;
 
+//TODO add another system that drives player animations
 
 pub fn rotate_player(
     mouse_pos: ResMut<MouseLoc>,
@@ -57,12 +58,18 @@ pub fn player_shoot(
     asset_server: Res<AssetServer>,
     mut weapon_query: Query<&mut Weapon, With<Player>>,
     time: Res<Time>,
+    mut player_anim: Query<&mut Animations, With<Player>>,
 ) {
+
     if mouse_input.just_pressed(MouseButton::Left) {
         if let Ok(mut weapon) = weapon_query.get_single_mut(){
             weapon.fire_rate.timer.reset();
 
             if weapon.ammo.bullets != 0{
+                if let Ok(mut anim) = player_anim.get_single_mut() {
+                    anim.current_animation = 2;
+                }
+    
                 if let Ok(player_position) = player_pos.get_single() {
 
                     let bullet_velocity = (mouse_pos.loc - player_position.translation.truncate()).normalize();
@@ -95,39 +102,44 @@ pub fn player_shoot(
             }
         }
     } else if mouse_input.pressed(MouseButton::Left){ 
-        //TODO add different actions for pressed and just pressed
         if let Ok(mut weapon) = weapon_query.get_single_mut(){
             weapon.fire_rate.timer.tick(time.delta());
+            if weapon.ammo.bullets != 0{
+                if let Ok(mut anim) = player_anim.get_single_mut() {
+                    anim.current_animation = 2;
+                }
 
-            if weapon.fire_rate.to_owned().timer.finished() && weapon.ammo.bullets != 0{
-                if let Ok(player_position) = player_pos.get_single() {
+                if weapon.fire_rate.to_owned().timer.finished() && weapon.ammo.bullets != 0{
+                    
+                    if let Ok(player_position) = player_pos.get_single() {
 
-                    let bullet_velocity = (mouse_pos.loc - player_position.translation.truncate()).normalize();
-                    let angle = bullet_velocity.y.atan2(bullet_velocity.x);
-                    commands.spawn(BulletBundle {
-                        sprite_bundle: SpriteBundle {
-                            transform: Transform {
-                                translation: Vec3::from_array([
-                                    player_position.translation.x + bullet_velocity.x * 8.0,
-                                    player_position.translation.y + bullet_velocity.y * 10.0,
-                                    0.0,
-                                ]),
-                                rotation: Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle),
+                        let bullet_velocity = (mouse_pos.loc - player_position.translation.truncate()).normalize();
+                        let angle = bullet_velocity.y.atan2(bullet_velocity.x);
+                        commands.spawn(BulletBundle {
+                            sprite_bundle: SpriteBundle {
+                                transform: Transform {
+                                    translation: Vec3::from_array([
+                                        player_position.translation.x + bullet_velocity.x * 8.0,
+                                        player_position.translation.y + bullet_velocity.y * 10.0,
+                                        0.0,
+                                    ]),
+                                    rotation: Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle),
+                                    ..Default::default()
+                                },
+                                texture: asset_server.load("bullet.png"),
                                 ..Default::default()
                             },
-                            texture: asset_server.load("bullet.png"),
-                            ..Default::default()
-                        },
-                        collider_bundle: ColliderBundle {
-                            collider: Collider::cuboid(0.5, 1.5),
-                            rigid_body: RigidBody::Dynamic,
-                            velocity: Velocity::linear(bullet_velocity * 500.0),
-                            ..Default::default()
-                        },
-                        bullet: Bullet {},
-                    }).insert(Sensor).insert(ActiveEvents::COLLISION_EVENTS);
+                            collider_bundle: ColliderBundle {
+                                collider: Collider::cuboid(0.5, 1.5),
+                                rigid_body: RigidBody::Dynamic,
+                                velocity: Velocity::linear(bullet_velocity * 500.0),
+                                ..Default::default()
+                            },
+                            bullet: Bullet {},
+                        }).insert(Sensor).insert(ActiveEvents::COLLISION_EVENTS);
 
-                    weapon.ammo.bullets -= 1;
+                        weapon.ammo.bullets -= 1;
+                    }
                 }
             }
         }
@@ -197,11 +209,14 @@ pub fn player_movement(
             }
         }
 
-        if !velocity.eq(&Velocity::zero()) {
-            if let Ok(mut anim) = player_anim.get_single_mut() {
+        if let Ok(mut anim) = player_anim.get_single_mut() {
+            if !velocity.eq(&Velocity::zero()) {
                 anim.current_animation = 0;
+            } else {
+                anim.current_animation = 3;
             }
         }
+        
     }
 }
 
@@ -278,6 +293,16 @@ pub fn spawn_player(
                             frames: characters.talk_animation.to_vec(),
                             current_frame: 0,
                         },
+                        FrameAnimation {
+                            timer: Timer::from_seconds(0.05, TimerMode::Repeating),
+                            frames: characters.shoot.to_vec(),
+                            current_frame: 0,
+                        },
+                        FrameAnimation {
+                            timer: Timer::from_seconds(0.4, TimerMode::Once),
+                            frames: characters.idle.to_vec(),
+                            current_frame: 0,
+                        }
                     ],
                     current_animation: 0,
                 });

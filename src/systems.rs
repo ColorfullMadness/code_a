@@ -7,6 +7,7 @@ use std::{
     collections::{HashMap, HashSet},
     vec,
 };
+use bevy::render::camera::ScalingMode;
 
 use crate::graphics::*;
 
@@ -15,10 +16,16 @@ use crate::game::player::components::Player;
 use crate::game::enemies::components::Zombie;
 
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let camera = Camera2dBundle::default();
+    let camera = Camera2dBundle {
+        projection: OrthographicProjection {
+            scaling_mode: ScalingMode::Fixed { width: 348.0, height: 195.0 },
+            ..default()
+        },
+            ..default()
+    };
     commands.spawn((camera, MainCamera));
 
-    let ldtk_handle = asset_server.load("test.ldtk");
+    let ldtk_handle = asset_server.load("marmolada.ldtk");
     commands.spawn(LdtkWorldBundle {
         ldtk_handle,
         ..Default::default()
@@ -564,8 +571,8 @@ pub fn camera_fit_inside_current_level(
 
                     let height = (level.px_hei as f32 / 9.).round() * 9. / 1.7;
                     let width = height * ASPECT_RATIO;
-                    orthographic_projection.scaling_mode =
-                        bevy::render::camera::ScalingMode::Fixed { width, height };
+ //                   orthographic_projection.scaling_mode =
+          //              bevy::render::camera::ScalingMode::Fixed { width, height };
 
                     if let Ok(player_position) = player_pos.get_single() {
                         let camera_pos_offset =
@@ -576,12 +583,12 @@ pub fn camera_fit_inside_current_level(
 
                         camera_transform.translation.x =
                             (player_translation.x - level_transform.translation.x - width / 2.
-                                + camera_pos_offset.x * distance / 5.0)
-                                .clamp(0., level.px_wid as f32 - width);
+                                + camera_pos_offset.x * distance / 5.0);
+                                //.clamp(0., level.px_wid as f32 - width);
                         camera_transform.translation.y =
                             (player_translation.y - level_transform.translation.y - height / 2.
-                                + camera_pos_offset.y * distance / 5.0)
-                                .clamp(0., level.px_hei as f32 - height);
+                                + camera_pos_offset.y * distance / 5.0);
+                                //.clamp(0., level.px_hei as f32 - height);
 
                         camera_transform.translation.x += level_transform.translation.x;
                         camera_transform.translation.y += level_transform.translation.y;
